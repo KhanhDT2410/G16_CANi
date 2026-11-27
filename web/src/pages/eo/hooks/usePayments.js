@@ -126,7 +126,10 @@ export function usePayments() {
         'success'
       );
     } catch (error) {
-      showToast(error.response?.data?.message || 'Khai báo thanh toán thất bại. Vui lòng thử lại!', 'error');
+      showToast(
+        error.response?.data?.message || error.userMessage || error.message || 'Khai báo thanh toán thất bại. Vui lòng thử lại!',
+        'error'
+      );
     }
   };
 

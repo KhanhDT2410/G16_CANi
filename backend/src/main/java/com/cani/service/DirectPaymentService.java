@@ -147,10 +147,11 @@ public class DirectPaymentService {
         log.info("EO {} đã khai báo thanh toán {} VND cho Worker {} (Assignment {})",
                 eoId, dto.getDeclaredAmount(), payment.getWorker().getWorkerId(), dto.getAssignmentId());
 
+        Shift shift = assignment.getShift();
+        Event event = shift != null ? shift.getEvent() : null;
+
         if (notificationService != null && payment.getWorker() != null
                 && payment.getWorker().getUser() != null && payment.getWorker().getUser().getUserId() != null) {
-            Shift shift = assignment.getShift();
-            Event event = shift != null ? shift.getEvent() : null;
             String shiftLabel = describeShift(shift, event);
             String amountText = formatVnd(dto.getDeclaredAmount());
             String methodText = describeMethod(dto.getPaymentMethod());
@@ -191,7 +192,7 @@ public class DirectPaymentService {
             );
         }
 
-        return mapToDto(saved);
+        return shift != null ? mapToDto(saved, shift, event) : mapToDto(saved);
     }
 
     private static final java.time.ZoneId VN_ZONE = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
@@ -273,19 +274,19 @@ public class DirectPaymentService {
                     "Ban tổ chức chưa khai báo thanh toán thù lao (Bước 4) cho ca làm việc này.");
         }
 
-        if (assignmentRepository != null) {
-            ShiftAssignment assignment = assignmentRepository.findById(assignmentId).orElse(null);
-            if (assignment != null && assignment.getStatus() != null) {
-                if (assignment.getStatus() != com.cani.entity.enums.AssignmentStatus.CHECKED_IN
-                        && assignment.getStatus() != com.cani.entity.enums.AssignmentStatus.COMPLETED) {
-                    throw new com.cani.exception.BadRequestException(
-                            "Xác nhận thanh toán chỉ mở sau khi đã check-in vào ca.");
-                }
-                if (assignment.getStatus() == com.cani.entity.enums.AssignmentStatus.CHECKED_IN
-                        && !Boolean.TRUE.equals(assignment.getEoConfirmed())) {
-                    throw new com.cani.exception.BadRequestException(
-                            "Ban tổ chức cần Duyệt công hoàn thành (Bước 3) trước khi xác nhận thanh toán thù lao.");
-                }
+        ShiftAssignment loadedAssignment = assignmentRepository != null
+                ? assignmentRepository.findById(assignmentId).orElse(null)
+                : null;
+        if (loadedAssignment != null && loadedAssignment.getStatus() != null) {
+            if (loadedAssignment.getStatus() != com.cani.entity.enums.AssignmentStatus.CHECKED_IN
+                    && loadedAssignment.getStatus() != com.cani.entity.enums.AssignmentStatus.COMPLETED) {
+                throw new com.cani.exception.BadRequestException(
+                        "Xác nhận thanh toán chỉ mở sau khi đã check-in vào ca.");
+            }
+            if (loadedAssignment.getStatus() == com.cani.entity.enums.AssignmentStatus.CHECKED_IN
+                    && !Boolean.TRUE.equals(loadedAssignment.getEoConfirmed())) {
+                throw new com.cani.exception.BadRequestException(
+                        "Ban tổ chức cần Duyệt công hoàn thành (Bước 3) trước khi xác nhận thanh toán thù lao.");
             }
         }
 
@@ -334,80 +335,76 @@ public class DirectPaymentService {
 
         log.info("Worker {} xác nhận thanh toán: {} cho Assignment {}", workerId, normalizedConfirmStatus, assignmentId);
 
-        if (assignmentRepository != null) {
-            assignmentRepository.findById(assignmentId).ifPresent(sa -> {
-                Shift shift = sa.getShift();
-                Event ev = shift != null ? shift.getEvent() : null;
-                if (ev != null && ev.getEventOrganizer() != null && ev.getEventOrganizer().getUser() != null
-                        && ev.getEventOrganizer().getUser().getUserId() != null) {
-                    User eoUser = ev.getEventOrganizer().getUser();
-                    UUID eoUserId = eoUser.getUserId();
-                    String workerName = sa.getWorker() != null ? sa.getWorker().getFullName() : "Nhân sự";
-                    String shiftLabel = describeShift(shift, ev);
-                    String title;
-                    String body;
-                    String statusLabel;
-                    NotificationType nType;
-                    if ("RECEIVED_FULL".equals(normalizedConfirmStatus)) {
-                        title = "Nhân sự xác nhận đã nhận đủ thù lao";
-                        body = workerName + " đã xác nhận nhận đủ tiền công cho ca " + shiftLabel + ".";
-                        statusLabel = "Đã nhận đủ";
-                        nType = NotificationType.PAYMENT;
-                    } else if ("RECEIVED_PARTIAL".equals(normalizedConfirmStatus)) {
-                        title = "Nhân sự báo mới nhận một phần thù lao";
-                        body = workerName + " phản hồi mới nhận một phần thù lao ca " + shiftLabel + ". Vui lòng kiểm tra lại.";
-                        statusLabel = "Chỉ nhận một phần";
-                        nType = NotificationType.PAYMENT;
-                    } else {
-                        title = "Khiếu nại chưa nhận được thù lao";
-                        body = workerName + " báo chưa nhận được thù lao ca " + shiftLabel + ". Hệ thống đã mở hồ sơ tranh chấp.";
-                        statusLabel = "Chưa nhận được (Mở tranh chấp)";
-                        nType = NotificationType.DISPUTE;
-                    }
-                    if (notificationService != null) {
-                        try {
-                            notificationService.createAndSend(
-                                    eoUserId,
-                                    title,
-                                    body,
-                                    nType,
-                                    "SHIFT",
-                                    shift.getShiftId(),
-                                    Map.of(
-                                            "eventId", ev.getEventId().toString(),
-                                            "shiftId", shift.getShiftId().toString(),
-                                            "assignmentId", assignmentId.toString()
-                                    )
-                            );
-                        } catch (Exception ex) {
-                            log.warn("Không thể gửi thông báo xác nhận thanh toán cho EO: {}", ex.getMessage());
-                        }
-                    }
-
-                    Map<String, String> details = new java.util.LinkedHashMap<>();
-                    details.put("Ca làm việc", shiftLabel);
-                    details.put("Nhân sự", workerName);
-                    details.put("Trạng thái phản hồi", statusLabel);
-                    details.put("Số tiền đã khai trả", formatVnd(saved.getDeclaredAmount()));
-                    details.put("Thù lao thỏa thuận", formatVnd(saved.getAgreedAmount()));
-                    details.put("Phương thức", describeMethod(saved.getPaymentMethod()));
-                    details.put("Mã giao dịch", saved.getExternalRef());
-                    details.put("Ghi chú nhân sự", dto.getComment());
-                    details.put("Thời điểm phản hồi", formatInstant(saved.getWorkerConfirmedAt()));
-                    sendEmailAfterCommit(
-                            eoUser.getEmail(),
-                            "[CANi] " + title + " — " + shiftLabel,
+        Shift loadedShift = loadedAssignment != null ? loadedAssignment.getShift() : null;
+        Event loadedEvent = loadedShift != null ? loadedShift.getEvent() : null;
+        if (loadedEvent != null && loadedEvent.getEventOrganizer() != null && loadedEvent.getEventOrganizer().getUser() != null
+                && loadedEvent.getEventOrganizer().getUser().getUserId() != null) {
+            User eoUser = loadedEvent.getEventOrganizer().getUser();
+            UUID eoUserId = eoUser.getUserId();
+            String workerName = loadedAssignment.getWorker() != null ? loadedAssignment.getWorker().getFullName() : "Nhân sự";
+            String shiftLabel = describeShift(loadedShift, loadedEvent);
+            String title;
+            String body;
+            String statusLabel;
+            NotificationType nType;
+            if ("RECEIVED_FULL".equals(normalizedConfirmStatus)) {
+                title = "Nhân sự xác nhận đã nhận đủ thù lao";
+                body = workerName + " đã xác nhận nhận đủ tiền công cho ca " + shiftLabel + ".";
+                statusLabel = "Đã nhận đủ";
+                nType = NotificationType.PAYMENT;
+            } else if ("RECEIVED_PARTIAL".equals(normalizedConfirmStatus)) {
+                title = "Nhân sự báo mới nhận một phần thù lao";
+                body = workerName + " phản hồi mới nhận một phần thù lao ca " + shiftLabel + ". Vui lòng kiểm tra lại.";
+                statusLabel = "Chỉ nhận một phần";
+                nType = NotificationType.PAYMENT;
+            } else {
+                title = "Khiếu nại chưa nhận được thù lao";
+                body = workerName + " báo chưa nhận được thù lao ca " + shiftLabel + ". Hệ thống đã mở hồ sơ tranh chấp.";
+                statusLabel = "Chưa nhận được (Mở tranh chấp)";
+                nType = NotificationType.DISPUTE;
+            }
+            if (notificationService != null) {
+                try {
+                    notificationService.createAndSend(
+                            eoUserId,
                             title,
                             body,
-                            details,
-                            saved.getPaymentProofUrl(),
-                            "Bạn có thể xem lại chứng từ và trạng thái đối soát trực tiếp trong màn Quản lý ca làm việc trên CANi Web."
+                            nType,
+                            "SHIFT",
+                            loadedShift.getShiftId(),
+                            Map.of(
+                                    "eventId", loadedEvent.getEventId().toString(),
+                                    "shiftId", loadedShift.getShiftId().toString(),
+                                    "assignmentId", assignmentId.toString()
+                            )
                     );
+                } catch (Exception ex) {
+                    log.warn("Không thể gửi thông báo xác nhận thanh toán cho EO: {}", ex.getMessage());
                 }
-            });
+            }
+
+            Map<String, String> details = new java.util.LinkedHashMap<>();
+            details.put("Ca làm việc", shiftLabel);
+            details.put("Nhân sự", workerName);
+            details.put("Trạng thái phản hồi", statusLabel);
+            details.put("Số tiền đã khai trả", formatVnd(saved.getDeclaredAmount()));
+            details.put("Thù lao thỏa thuận", formatVnd(saved.getAgreedAmount()));
+            details.put("Phương thức", describeMethod(saved.getPaymentMethod()));
+            details.put("Mã giao dịch", saved.getExternalRef());
+            details.put("Ghi chú nhân sự", dto.getComment());
+            details.put("Thời điểm phản hồi", formatInstant(saved.getWorkerConfirmedAt()));
+            sendEmailAfterCommit(
+                    eoUser.getEmail(),
+                    "[CANi] " + title + " — " + shiftLabel,
+                    title,
+                    body,
+                    details,
+                    saved.getPaymentProofUrl(),
+                    "Bạn có thể xem lại chứng từ và trạng thái đối soát trực tiếp trong màn Quản lý ca làm việc trên CANi Web."
+            );
         }
 
-        return mapToDto(saved);
+        return loadedShift != null ? mapToDto(saved, loadedShift, loadedEvent) : mapToDto(saved);
     }
 
     private void updateEventTotalPaid(UUID eventId) {

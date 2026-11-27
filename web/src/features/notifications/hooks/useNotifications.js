@@ -40,6 +40,19 @@ export const useNotifications = () => {
     }
   }, []);
 
+  const isSelfTriggeredConfirmationToast = (item) => {
+    let rawData = item?.data;
+    if (typeof rawData === 'string') {
+      try {
+        rawData = JSON.parse(rawData);
+      } catch {
+        rawData = null;
+      }
+    }
+    const actionType = String(rawData?.type || '').toUpperCase();
+    return actionType === 'EMERGENCY_DISPATCH_ACTIVE' || actionType === 'EMERGENCY_DISPATCH_DISABLED';
+  };
+
   const syncDomainFromLatestNotifications = useCallback(
     (arr, { suppressToast = false } = {}) => {
       if (!Array.isArray(arr)) return;
@@ -57,7 +70,7 @@ export const useNotifications = () => {
 
       newlyArrived.forEach((n) => {
         seenNotificationIdsRef.current.add(n.notificationId);
-        if (!suppressToast && !n.isRead) {
+        if (!suppressToast && !n.isRead && !isSelfTriggeredConfirmationToast(n)) {
           notifyDesktop(n);
         }
       });

@@ -168,8 +168,18 @@ public class WorkerShiftEligibilityService {
             List<WorkerSkill> workerSkills,
             Set<UUID> blockedUserIds,
             Map<UUID, List<ShiftSkillRequirement>> skillReqsByShiftId,
-            Map<UUID, String> skillNamesById
-    ) {}
+            Map<UUID, String> skillNamesById,
+            List<ShiftAssignment> conflictingAssignments
+    ) {
+        public WorkerEligibilityContext(
+                List<WorkerAvailability> availabilitySlots,
+                List<WorkerSkill> workerSkills,
+                Set<UUID> blockedUserIds,
+                Map<UUID, List<ShiftSkillRequirement>> skillReqsByShiftId,
+                Map<UUID, String> skillNamesById) {
+            this(availabilitySlots, workerSkills, blockedUserIds, skillReqsByShiftId, skillNamesById, null);
+        }
+    }
 
     public EligibilityResult evaluate(
             Worker worker,
@@ -271,13 +281,16 @@ public class WorkerShiftEligibilityService {
         }
 
         // 4. Xung đột lịch làm việc (không bao giờ bypass khi nhận/dispatch; query Radar có thể đánh dấu isConflicting)
-        if (!ignoreScheduleConflict && shiftAssignmentRepository != null && worker.getWorkerId() != null) {
+        if (!ignoreScheduleConflict && worker.getWorkerId() != null
+                && ((context != null && context.conflictingAssignments() != null) || shiftAssignmentRepository != null)) {
             List<AssignmentStatus> activeStatuses = List.of(
                     AssignmentStatus.CONFIRMED,
                     AssignmentStatus.CHECKED_IN,
                     AssignmentStatus.PENDING);
-            List<ShiftAssignment> conflicts = shiftAssignmentRepository.findConflictingAssignments(
-                    worker.getWorkerId(), shift.getStartTime(), shift.getEndTime(), activeStatuses);
+            List<ShiftAssignment> conflicts = (context != null && context.conflictingAssignments() != null)
+                    ? context.conflictingAssignments()
+                    : shiftAssignmentRepository.findConflictingAssignments(
+                            worker.getWorkerId(), shift.getStartTime(), shift.getEndTime(), activeStatuses);
             ScheduleConflictInfo conflictInfo = findScheduleConflict(shift, conflicts, true);
             if (conflictInfo.conflicting()) {
                 return EligibilityResult.fail("SCHEDULE_CONFLICT", conflictInfo.reasonMessageVi());
@@ -412,7 +425,7 @@ public class WorkerShiftEligibilityService {
             List<WorkerSkill> preloadedWorkerSkills,
             List<ShiftSkillRequirement> preloadedReqs,
             Map<UUID, String> preloadedSkillNames) {
-        return evaluateSkillFit(worker, shift, preloadedWorkerSkills, preloadedReqs, preloadedSkillNames, true);
+        return evaluateSkillFit(worker, shift, preloadedWorkerSkills, preloadedReqs, preloadedSkillNames, preloadedReqs != null);
     }
 
     private SkillFitResult evaluateSkillFit(

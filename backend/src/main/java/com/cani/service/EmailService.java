@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -19,8 +20,9 @@ public class EmailService {
     private String fromEmail;
 
     /**
-     * Gửi email chứa mã xác thực OTP 6 số đến người dùng.
+     * Gửi email chứa mã xác thực OTP 6 số đến người dùng (bất đồng bộ để không chặn luồng HTTP).
      */
+    @Async("mailTaskExecutor")
     public void sendOtpEmail(String toEmail, String otpCode) {
 
         if (mailSender == null || fromEmail == null || fromEmail.isBlank()) {
@@ -54,6 +56,7 @@ public class EmailService {
      * @param details   các dòng thông tin hiển thị theo thứ tự (nhãn -> giá trị), đã là văn bản thuần
      * @param proofImage chứng từ: Data URI, URL http(s), hoặc null nếu không có
      */
+    @Async("mailTaskExecutor")
     public void sendPaymentEmail(String toEmail, String subject, String heading, String intro,
                                  java.util.Map<String, String> details, String proofImage, String footerNote) {
         if (mailSender == null || fromEmail == null || fromEmail.isBlank()) {

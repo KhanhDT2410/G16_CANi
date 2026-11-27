@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/core/network/dio_client.dart';
+import 'package:cani/core/notifications/fcm_service.dart';
 import 'package:cani/core/notifications/local_notification_service.dart';
 import 'package:cani/core/notifications/notification_sync_router.dart';
 import 'package:cani/features/auth/auth.dart';
@@ -192,6 +193,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
         for (final n in visibleUnread.take(3)) {
           final idStr = n['notificationId'].toString();
+          if (FcmService.hasDisplayedNotification(idStr)) {
+            continue;
+          }
+          FcmService.markNotificationDisplayed(idStr);
           final title = n['title']?.toString() ?? 'Thông báo mới từ CANi';
           final body = n['body']?.toString() ?? '';
           await LocalNotificationService.showNotification(

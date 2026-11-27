@@ -26,6 +26,11 @@ public interface ShiftAssignmentRepository extends JpaRepository<ShiftAssignment
         long getConfirmedCount();
     }
 
+    interface WorkerLastActivityProjection {
+        UUID getWorkerId();
+        Instant getLastActivity();
+    }
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT sa FROM ShiftAssignment sa WHERE sa.assignmentId = :assignmentId")
     Optional<ShiftAssignment> findByIdForUpdate(@Param("assignmentId") UUID assignmentId);
@@ -92,6 +97,19 @@ public interface ShiftAssignmentRepository extends JpaRepository<ShiftAssignment
             @Param("endTime") Instant endTime,
             @Param("activeStatuses") List<AssignmentStatus> activeStatuses
     );
+
+    @Query("SELECT sa FROM ShiftAssignment sa JOIN sa.shift s WHERE sa.worker.workerId IN :workerIds AND sa.status IN :activeStatuses AND s.startTime < :endTime AND s.endTime > :startTime")
+    List<ShiftAssignment> findConflictingAssignmentsForWorkers(
+            @Param("workerIds") Collection<UUID> workerIds,
+            @Param("startTime") Instant startTime,
+            @Param("endTime") Instant endTime,
+            @Param("activeStatuses") List<AssignmentStatus> activeStatuses
+    );
+
+    @Query("SELECT sa.worker.workerId AS workerId, MAX(COALESCE(s.endTime, sa.createdAt)) AS lastActivity " +
+           "FROM ShiftAssignment sa LEFT JOIN sa.shift s " +
+           "WHERE sa.worker.workerId IN :workerIds GROUP BY sa.worker.workerId")
+    List<WorkerLastActivityProjection> findLastActivityByWorkerIds(@Param("workerIds") Collection<UUID> workerIds);
 
     @Query("SELECT sa FROM ShiftAssignment sa " +
            "JOIN FETCH sa.shift s " +

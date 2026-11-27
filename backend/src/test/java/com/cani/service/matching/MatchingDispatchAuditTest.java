@@ -437,19 +437,27 @@ class MatchingDispatchAuditTest {
             // Worker C: Base ~ 75 (dist=40 + rating=3.0->18 + exp=5->10 + rs=70->7 = 75.0) + Req AI_DOC(3) + Pref PLATFORM_PROVEN(4) = 82.0
             Worker workerC = createEligibleWorker("W_C_Base75", 10.7769, 106.7009, 3.0, 5, 5, 70);
 
-            when(workerSkillRepository.findByWorker_WorkerId(workerA.getWorkerId())).thenReturn(List.of(
+            List<WorkerSkill> workerASkills = List.of(
                     WorkerSkill.builder().worker(workerA).skill(reqSkill).verificationTier(VerificationTier.PLATFORM_PROVEN).build(),
                     WorkerSkill.builder().worker(workerA).skill(prefSkill).verificationTier(VerificationTier.AI_DOCUMENT)
                             .expiresAt(Instant.now().plus(10, ChronoUnit.DAYS)).build()
-            ));
-            when(workerSkillRepository.findByWorker_WorkerId(workerB.getWorkerId())).thenReturn(List.of(
+            );
+            List<WorkerSkill> workerBSkills = List.of(
                     WorkerSkill.builder().worker(workerB).skill(reqSkill).verificationTier(VerificationTier.SELF_DECLARED).build()
-            ));
-            when(workerSkillRepository.findByWorker_WorkerId(workerC.getWorkerId())).thenReturn(List.of(
+            );
+            List<WorkerSkill> workerCSkills = List.of(
                     WorkerSkill.builder().worker(workerC).skill(reqSkill).verificationTier(VerificationTier.AI_DOCUMENT)
                             .expiresAt(Instant.now().plus(10, ChronoUnit.DAYS)).build(),
                     WorkerSkill.builder().worker(workerC).skill(prefSkill).verificationTier(VerificationTier.PLATFORM_PROVEN).build()
-            ));
+            );
+            lenient().when(workerSkillRepository.findByWorker_WorkerId(workerA.getWorkerId())).thenReturn(workerASkills);
+            lenient().when(workerSkillRepository.findByWorker_WorkerId(workerB.getWorkerId())).thenReturn(workerBSkills);
+            lenient().when(workerSkillRepository.findByWorker_WorkerId(workerC.getWorkerId())).thenReturn(workerCSkills);
+            List<WorkerSkill> allBatchSkills = new ArrayList<>();
+            allBatchSkills.addAll(workerASkills);
+            allBatchSkills.addAll(workerBSkills);
+            allBatchSkills.addAll(workerCSkills);
+            when(workerSkillRepository.findByWorker_WorkerIdIn(anyCollection())).thenReturn(allBatchSkills);
 
             when(shiftRepository.findById(activeShift.getShiftId())).thenReturn(Optional.of(activeShift));
             when(workerRepository.findByIsOnlineTrue()).thenReturn(List.of(workerB, workerC, workerA));
@@ -486,15 +494,64 @@ class MatchingDispatchAuditTest {
                 }
             }
 
+            // 2 remaining eligible workers (W5, W6) must BOTH receive proposals instead of getting dropped by premature limit(5)
+            List<UUID> existingPropWorkers = workers.subList(0, 3).stream().map(Worker::getWorkerId).toList();
+            List<ShiftAssignment> existingAssigns = workers.subList(3, 5).stream()
+                    .map(w -> ShiftAssignment.builder().worker(w).shift(activeShift).status(AssignmentStatus.CONFIRMED).build())
+                    .toList();
+            when(dispatchProposalRepository.findWorkerIdsByShiftIdAndStatusIn(eq(activeShift.getShiftId()), anyCollection()))
+                    .thenReturn(existingPropWorkers);
+            when(shiftAssignmentRepository.findByShift_ShiftId(activeShift.getShiftId()))
+                    .thenReturn(existingAssigns);
+
             when(shiftRepository.findById(activeShift.getShiftId())).thenReturn(Optional.of(activeShift));
             when(workerRepository.findByIsOnlineTrue()).thenReturn(workers);
             when(dispatchProposalRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             int count = matchingDispatchService.dispatchForShift(activeShift.getShiftId());
 
-            // 2 remaining eligible workers (W5, W6) must BOTH receive proposals instead of getting dropped by premature limit(5)
             assertEquals(2, count);
             verify(dispatchProposalRepository, times(2)).save(any());
+        }
+
+        @Test
+        @DisplayName("Emergency Dispatch dùng batch queries cho >2 online workers (triệt tiêu N+1 per-worker)")
+        void triggerEmergencyDispatch_UsesBatchQueriesInsteadOfPerWorkerQueries() {
+            UUID skillId = UUID.randomUUID();
+            Skill reqSkill = Skill.builder().skillId(skillId).name("Lễ tân").build();
+            List<Worker> workers = new ArrayList<>();
+            List<WorkerSkill> batchSkills = new ArrayList<>();
+            for (int i = 0; i < 4; i++) {
+                Worker w = createEligibleWorker("EmgW" + i, 10.7769, 106.7009, 4.5, 5, 5, 85);
+                workers.add(w);
+                batchSkills.add(WorkerSkill.builder()
+                        .worker(w)
+                        .skill(reqSkill)
+                        .verificationTier(VerificationTier.PLATFORM_PROVEN)
+                        .build());
+            }
+            activeShift.setRequiredSkills(new UUID[]{skillId});
+
+            when(shiftRepository.findById(activeShift.getShiftId())).thenReturn(Optional.of(activeShift));
+            when(workerRepository.findByIsOnlineTrue()).thenReturn(workers);
+            when(workerSkillRepository.findByWorker_WorkerIdIn(anyCollection())).thenReturn(batchSkills);
+            when(dispatchProposalRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            int count = matchingDispatchService.triggerEmergencyDispatch(activeShift.getShiftId(), 25.0);
+            assertEquals(4, count);
+
+            verify(workerSkillRepository, times(1)).findByWorker_WorkerIdIn(anyCollection());
+            verify(workerSkillRepository, never()).findByWorker_WorkerId(any());
+            verify(workerAvailabilityRepository, times(1))
+                    .findByWorker_WorkerIdInOrderByDayOfWeekAscStartTimeAsc(anyCollection());
+            verify(workerAvailabilityRepository, never())
+                    .findByWorker_WorkerIdOrderByDayOfWeekAscStartTimeAsc(any());
+            verify(shiftAssignmentRepository, times(1))
+                    .findConflictingAssignmentsForWorkers(anyCollection(), any(), any(), anyList());
+            verify(shiftAssignmentRepository, never())
+                    .findConflictingAssignments(any(), any(), any(), anyList());
+            verify(dispatchProposalRepository, never())
+                    .existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(any(), any(), anyList());
         }
     }
 }

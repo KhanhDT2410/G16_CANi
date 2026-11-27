@@ -1151,10 +1151,17 @@ class MatchingDispatchServiceTest {
                         when(workerGroupMembershipRepository.findByWorkerGroup_GroupIdInAndStatus(anyList(),
                                         eq(MembershipStatus.ACTIVE)))
                                         .thenReturn(members.stream().map(m -> membership(group, m)).toList());
-                        when(shiftAssignmentRepository.findConflictingAssignments(eq(conflicted.getWorkerId()), any(),
+                        ShiftAssignment conflictAssignment = ShiftAssignment.builder()
+                                        .assignmentId(UUID.randomUUID())
+                                        .worker(conflicted)
+                                        .status(AssignmentStatus.CONFIRMED)
+                                        .build();
+                        lenient().when(shiftAssignmentRepository.findConflictingAssignments(eq(conflicted.getWorkerId()), any(),
                                         any(), anyList()))
-                                        .thenReturn(List.of(ShiftAssignment.builder().assignmentId(UUID.randomUUID())
-                                                        .status(AssignmentStatus.CONFIRMED).build()));
+                                        .thenReturn(List.of(conflictAssignment));
+                        when(shiftAssignmentRepository.findConflictingAssignmentsForWorkers(anyCollection(), any(),
+                                        any(), anyList()))
+                                        .thenReturn(List.of(conflictAssignment));
 
                         int count = matchingDispatchService.dispatchGroupsForShift(sampleShift.getShiftId(), false);
 

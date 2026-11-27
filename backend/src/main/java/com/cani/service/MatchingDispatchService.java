@@ -127,6 +127,45 @@ public class MatchingDispatchService {
         private String scoreBreakdownJson;
     }
 
+    private record DispatchScoringConfig(
+            double neutralRating,
+            double newWorkerBoost,
+            double idleWorkerBoost,
+            int idleDaysThreshold
+    ) {}
+
+    private record BatchWorkerContextData(
+            Map<UUID, List<ShiftSkillRequirement>> skillReqsByShiftId,
+            Map<UUID, String> skillNamesById,
+            Set<UUID> blockedUserIdsWithEo,
+            UUID eoUserId,
+            Map<UUID, List<WorkerSkill>> skillsByWorkerId,
+            Map<UUID, List<WorkerAvailability>> availabilityByWorkerId,
+            Map<UUID, List<ShiftAssignment>> conflictsByWorkerId,
+            Map<UUID, Instant> lastActivityByWorkerId,
+            Set<UUID> existingProposalOrAssignmentWorkerIds,
+            DispatchScoringConfig scoringConfig
+    ) {
+        WorkerShiftEligibilityService.WorkerEligibilityContext forWorker(Worker worker) {
+            UUID wId = worker != null ? worker.getWorkerId() : null;
+            UUID wUserId = (worker != null && worker.getUser() != null) ? worker.getUser().getUserId() : null;
+            Set<UUID> workerBlockedSet = null;
+            if (blockedUserIdsWithEo != null && eoUserId != null) {
+                workerBlockedSet = (wUserId != null && blockedUserIdsWithEo.contains(wUserId))
+                        ? Set.of(eoUserId)
+                        : Collections.emptySet();
+            }
+            return new WorkerShiftEligibilityService.WorkerEligibilityContext(
+                    availabilityByWorkerId != null && wId != null ? availabilityByWorkerId.getOrDefault(wId, Collections.emptyList()) : null,
+                    skillsByWorkerId != null && wId != null ? skillsByWorkerId.getOrDefault(wId, Collections.emptyList()) : null,
+                    workerBlockedSet,
+                    skillReqsByShiftId,
+                    skillNamesById,
+                    conflictsByWorkerId != null && wId != null ? conflictsByWorkerId.getOrDefault(wId, Collections.emptyList()) : null
+            );
+        }
+    }
+
     /**
      * Kích hoạt matching hàng loạt cho toàn bộ ca làm việc ACTIVE của một sự kiện.
      * Thường được gọi sau khi Event Organizer nạp cọc thành công và Event chuyển
@@ -206,23 +245,20 @@ public class MatchingDispatchService {
                 ? shift.getMaxDistanceKm().doubleValue()
                 : MAX_DISTANCE_KM;
 
-        // 1. Chỉ lấy danh sách Worker đang Online (tuyệt đối không fallback full-table
-        // scan Worker offline)
+        // 1. Chỉ lấy danh sách Worker đang Online (tuyệt đối không fallback full-table scan Worker offline)
         List<Worker> onlineWorkers = workerRepository.findByIsOnlineTrue();
         if (onlineWorkers == null || onlineWorkers.isEmpty()) {
             log.info("Bỏ qua dispatch ca {}: hiện không có Worker nào đang Online.", shiftId);
             return 0;
         }
 
+        BatchWorkerContextData batchCtx = preloadBatchWorkerContext(shift, onlineWorkers);
         List<CandidateMatch> matchedCandidates = new ArrayList<>();
 
         for (Worker worker : onlineWorkers) {
-            // 2. Hard Filter
-            if (!passHardFilter(worker, shift)) {
+            if (!passHardFilter(worker, shift, WorkerShiftEligibilityService.MatchingChannel.MATCHING_DISPATCH, batchCtx)) {
                 continue;
             }
-
-            // 3. Kiểm tra tọa độ Worker & tính khoảng cách Haversine thực tế
             if (!isValidCoordinate(worker.getBaseLat(), worker.getBaseLng())) {
                 log.debug("Loại trừ worker {}: thiếu tọa độ GPS hợp lệ (lat={}, lng={}).",
                         worker.getWorkerId(), worker.getBaseLat(), worker.getBaseLng());
@@ -242,74 +278,18 @@ public class MatchingDispatchService {
                 continue;
             }
 
-            // 4. Soft Ranking Score
-            CandidateMatch match = calculateSoftScore(worker, distanceKm, effectiveAllowedDistanceKm, shift);
+            CandidateMatch match = calculateSoftScore(worker, distanceKm, effectiveAllowedDistanceKm, shift, batchCtx);
             matchedCandidates.add(match);
         }
 
-        // 5. Sắp xếp ứng viên theo điểm số giảm dần (nếu bằng điểm thì ưu tiên gần hơn)
-        matchedCandidates.sort(Comparator.comparingDouble(CandidateMatch::getFinalScore).reversed()
-                .thenComparingDouble(CandidateMatch::getDistanceKm));
-
-        // 6-7. Loại Worker đã có Proposal PENDING/ACCEPTED hoặc đã có Assignment trước
-        // khi cắt Top N
-        List<CandidateMatch> eligibleCandidates = matchedCandidates.stream()
-                .filter(candidate -> !hasExistingProposalOrAssignment(shiftId, candidate.getWorker().getWorkerId()))
-                .toList();
-
-        // 8. Dispatch ratio: tuyển N người -> chọn Top min(N * 2 + 3, số ứng viên hợp
-        // lệ)
-        int targetDispatchCount = Math.max(needed * 2 + 3, needed);
-        List<CandidateMatch> topCandidates = eligibleCandidates.stream()
-                .limit(targetDispatchCount)
-                .collect(Collectors.toList());
-
-        int createdCount = 0;
-        Instant expiresAt = Instant.now().plus(Duration.ofHours(DEFAULT_TIMEOUT_HOURS));
-
-        for (CandidateMatch candidate : topCandidates) {
-            if (!isShiftReadyForProposal(shift, false)) {
-                log.info("Dừng dispatch sớm cho ca {}: ca không còn ACTIVE hoặc đã đủ nhân sự.", shiftId);
-                break;
-            }
-
-            Worker worker = candidate.getWorker();
-            // Kiểm tra lại trước khi ghi DB để hạn chế race condition
-            if (hasExistingProposalOrAssignment(shiftId, worker.getWorkerId())) {
-                continue;
-            }
-
-            DispatchProposal proposal = DispatchProposal.builder()
-                    .shift(shift)
-                    .worker(worker)
-                    .matchScore(BigDecimal.valueOf(candidate.getFinalScore()).setScale(2, RoundingMode.HALF_UP))
-                    .scoreBreakdown(candidate.getScoreBreakdownJson())
-                    .status(ProposalStatus.PENDING)
-                    .expiresAt(expiresAt)
-                    .build();
-
-            DispatchProposal savedProposal = dispatchProposalRepository.save(proposal);
-            createdCount++;
-
-            if (notificationService != null && worker.getUser() != null && worker.getUser().getUserId() != null) {
-                try {
-                    String eventName = shift.getEvent() != null ? shift.getEvent().getName() : "Sự kiện CANi";
-                    notificationService.createAndSend(
-                            worker.getUser().getUserId(),
-                            "Đề xuất ca làm mới: " + shift.getJobType(),
-                            "Bạn vừa nhận được lời mời làm việc tại \"" + eventName + "\" với mức thù lao "
-                                    + shift.getHourlyWage() + " đ/giờ.",
-                            NotificationType.PROPOSAL,
-                            "PROPOSAL",
-                            savedProposal != null && savedProposal.getProposalId() != null
-                                    ? savedProposal.getProposalId()
-                                    : shiftId,
-                            Map.of("shiftId", shiftId.toString(), "type", "NEW_PROPOSAL"));
-                } catch (Exception ex) {
-                    log.warn("Không thể gửi thông báo FCM cho đề xuất ca làm: {}", ex.getMessage());
-                }
-            }
-        }
+        int createdCount = dispatchTopCandidates(
+                shift,
+                matchedCandidates,
+                needed,
+                false,
+                Duration.ofHours(DEFAULT_TIMEOUT_HOURS),
+                batchCtx
+        );
 
         if (matchedCandidates.isEmpty()) {
             log.warn("Matching ca {}: KHÔNG TÌM THẤY ứng viên nào đạt điều kiện. "
@@ -322,8 +302,8 @@ public class MatchingDispatchService {
         createdCount += dispatchGroupsForShift(shiftId, false);
 
         log.info(
-                "Matching hoàn tất cho ca {}: Tìm thấy {} ứng viên phù hợp ({} chưa trùng), đã gửi {} đề xuất (Proposals).",
-                shiftId, matchedCandidates.size(), eligibleCandidates.size(), createdCount);
+                "Matching hoàn tất cho ca {}: Tìm thấy {} ứng viên phù hợp, đã gửi {} đề xuất (Proposals).",
+                shiftId, matchedCandidates.size(), createdCount);
         return createdCount;
     }
 
@@ -480,11 +460,26 @@ public class MatchingDispatchService {
      * Hard Filter: Loại bỏ các ứng viên không đạt tiêu chuẩn tối thiểu
      */
     private boolean passHardFilter(Worker worker, Shift shift) {
-        return passHardFilter(worker, shift, WorkerShiftEligibilityService.MatchingChannel.MATCHING_DISPATCH);
+        return passHardFilter(worker, shift, WorkerShiftEligibilityService.MatchingChannel.MATCHING_DISPATCH, null);
     }
 
     private boolean passHardFilter(Worker worker, Shift shift, WorkerShiftEligibilityService.MatchingChannel channel) {
-        return getEligibilityService().evaluate(worker, shift, channel).eligible();
+        return passHardFilter(worker, shift, channel, null);
+    }
+
+    private boolean passHardFilter(
+            Worker worker,
+            Shift shift,
+            WorkerShiftEligibilityService.MatchingChannel channel,
+            BatchWorkerContextData batchCtx) {
+        return getEligibilityService().evaluate(
+                worker,
+                shift,
+                channel,
+                null,
+                false,
+                batchCtx != null ? batchCtx.forWorker(worker) : null
+        ).eligible();
     }
 
     /**
@@ -496,9 +491,15 @@ public class MatchingDispatchService {
         if (workerAvailabilityRepository == null || shift.getStartTime() == null || shift.getEndTime() == null) {
             return true;
         }
-
         List<WorkerAvailability> slots = workerAvailabilityRepository
                 .findByWorker_WorkerIdOrderByDayOfWeekAscStartTimeAsc(worker.getWorkerId());
+        return isShiftCoveredByAvailabilitySlots(slots, shift);
+    }
+
+    private boolean isShiftCoveredByAvailabilitySlots(List<WorkerAvailability> slots, Shift shift) {
+        if (shift.getStartTime() == null || shift.getEndTime() == null) {
+            return true;
+        }
 
         if (slots == null || slots.isEmpty()) {
             return true;
@@ -556,19 +557,24 @@ public class MatchingDispatchService {
      */
     private CandidateMatch calculateSoftScore(Worker worker, double distanceKm, double maxAllowedDistanceKm,
             Shift shift) {
+        return calculateSoftScore(worker, distanceKm, maxAllowedDistanceKm, shift, null);
+    }
+
+    private CandidateMatch calculateSoftScore(Worker worker, double distanceKm, double maxAllowedDistanceKm,
+            Shift shift, BatchWorkerContextData batchCtx) {
         double effectiveMaxDist = (Double.isFinite(maxAllowedDistanceKm) && maxAllowedDistanceKm > 0)
                 ? maxAllowedDistanceKm
                 : MAX_DISTANCE_KM;
         double safeDistanceKm = Double.isFinite(distanceKm) ? Math.max(0.0, distanceKm) : effectiveMaxDist;
 
-        // 1. Distance Score: 100 - (distance / maxAllowedDistanceKm) * 100 (Trọng số
-        // 0.4)
+        // 1. Distance Score: 100 - (distance / maxAllowedDistanceKm) * 100 (Trọng số 0.4)
         double distanceScore = clamp(100.0 - (safeDistanceKm / effectiveMaxDist) * 100.0, 0.0, 100.0);
 
-        // 2. Rating Score: Nếu Worker chưa có rating history (ratingCount <= 0), dùng
-        // mức trung tính (3.5/5.0 = 70 điểm)
-        double neutralRating = clamp(getConfigDouble("matching.neutral_unrated_rating", DEFAULT_NEUTRAL_RATING), 0.0,
-                5.0);
+        // 2. Rating Score: Nếu Worker chưa có rating history (ratingCount <= 0), dùng mức trung tính (3.5/5.0 = 70 điểm)
+        DispatchScoringConfig cfg = batchCtx != null ? batchCtx.scoringConfig() : null;
+        double neutralRating = cfg != null
+                ? cfg.neutralRating()
+                : clamp(getConfigDouble("matching.neutral_unrated_rating", DEFAULT_NEUTRAL_RATING), 0.0, 5.0);
         boolean hasRatingHistory = worker.getRatingCount() != null && worker.getRatingCount() > 0
                 && worker.getRatingAvg() != null;
         double rating = hasRatingHistory ? clamp(worker.getRatingAvg().doubleValue(), 0.0, 5.0) : neutralRating;
@@ -583,14 +589,30 @@ public class MatchingDispatchService {
         double rsScore = worker.getReliabilityScore() != null ? clamp(worker.getReliabilityScore(), 0.0, 100.0) : 60.0;
 
         // Bonus: Người mới hoặc nghỉ lâu thực tế (UC-60, UC-61: Fairness Boost)
-        double newWorkerBoostConfig = Math.max(0.0, getConfigDouble("fairness.new_worker_boost", 10.0));
-        double idleWorkerBoostConfig = Math.max(0.0, getConfigDouble("fairness.idle_worker_boost", 10.0));
+        double newWorkerBoostConfig = cfg != null
+                ? cfg.newWorkerBoost()
+                : Math.max(0.0, getConfigDouble("fairness.new_worker_boost", 10.0));
+        double idleWorkerBoostConfig = cfg != null
+                ? cfg.idleWorkerBoost()
+                : Math.max(0.0, getConfigDouble("fairness.idle_worker_boost", 10.0));
 
         double newWorkerBonus = (completedShifts < 3) ? newWorkerBoostConfig : 0.0;
-        double idleBonus = isEligibleForIdleBoost(worker, completedShifts) ? idleWorkerBoostConfig : 0.0;
+        double idleBonus = isEligibleForIdleBoost(worker, completedShifts, batchCtx) ? idleWorkerBoostConfig : 0.0;
 
         // SkillFitBonus V3 = 6 * RequiredQuality + 4 * PreferredFit (tổng tối đa 10.0)
-        WorkerShiftEligibilityService.SkillFitResult skillFit = getEligibilityService().evaluateSkillFit(worker, shift);
+        WorkerShiftEligibilityService.SkillFitResult skillFit;
+        if (batchCtx != null && batchCtx.skillsByWorkerId() != null) {
+            List<WorkerSkill> wSkills = worker.getWorkerId() != null
+                    ? batchCtx.skillsByWorkerId().getOrDefault(worker.getWorkerId(), Collections.emptyList())
+                    : Collections.emptyList();
+            List<ShiftSkillRequirement> preloadedReqs = (batchCtx.skillReqsByShiftId() != null && shift != null && shift.getShiftId() != null)
+                    ? batchCtx.skillReqsByShiftId().getOrDefault(shift.getShiftId(), Collections.emptyList())
+                    : null;
+            skillFit = getEligibilityService().evaluateSkillFit(
+                    worker, shift, wSkills, preloadedReqs, batchCtx.skillNamesById());
+        } else {
+            skillFit = getEligibilityService().evaluateSkillFit(worker, shift);
+        }
         double requiredSkillQuality = skillFit.requiredQuality();
         double preferredSkillFit = skillFit.preferredFit();
         double skillFitBonus = skillFit.skillFitBonus();
@@ -617,13 +639,22 @@ public class MatchingDispatchService {
                 .build();
     }
 
-    private boolean isEligibleForIdleBoost(Worker worker, int completedShifts) {
+    private boolean isEligibleForIdleBoost(Worker worker, int completedShifts, BatchWorkerContextData batchCtx) {
         if (completedShifts < 3 || !Boolean.TRUE.equals(worker.getIsOnline()) || worker.getWorkerId() == null) {
             return false;
         }
-        int idleDays = (int) Math.max(1.0,
-                getConfigDouble("fairness.idle_days_threshold", DEFAULT_IDLE_DAYS_THRESHOLD));
+        DispatchScoringConfig cfg = batchCtx != null ? batchCtx.scoringConfig() : null;
+        int idleDays = cfg != null
+                ? cfg.idleDaysThreshold()
+                : (int) Math.max(1.0, getConfigDouble("fairness.idle_days_threshold", DEFAULT_IDLE_DAYS_THRESHOLD));
         Instant idleCutoff = Instant.now().minus(Duration.ofDays(idleDays));
+        if (batchCtx != null && batchCtx.lastActivityByWorkerId() != null) {
+            Instant lastActivity = batchCtx.lastActivityByWorkerId().get(worker.getWorkerId());
+            if (lastActivity != null) {
+                return lastActivity.isBefore(idleCutoff);
+            }
+            return worker.getUpdatedAt() != null && worker.getUpdatedAt().isBefore(idleCutoff);
+        }
         List<ShiftAssignment> history = shiftAssignmentRepository
                 .findByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId());
         if (history != null && !history.isEmpty()) {
@@ -747,9 +778,10 @@ public class MatchingDispatchService {
             return dispatchGroupsForShift(shiftId, true, emergencyRadius);
         }
 
+        BatchWorkerContextData batchCtx = preloadBatchWorkerContext(shift, onlineWorkers);
         List<CandidateMatch> matchedCandidates = new ArrayList<>();
         for (Worker worker : onlineWorkers) {
-            if (!passHardFilter(worker, shift, WorkerShiftEligibilityService.MatchingChannel.EMERGENCY_DISPATCH)) {
+            if (!passHardFilter(worker, shift, WorkerShiftEligibilityService.MatchingChannel.EMERGENCY_DISPATCH, batchCtx)) {
                 continue;
             }
             if (!isValidCoordinate(worker.getBaseLat(), worker.getBaseLng())) {
@@ -760,33 +792,222 @@ public class MatchingDispatchService {
             if (!Double.isFinite(distanceKm) || distanceKm > emergencyRadius) {
                 continue;
             }
-            CandidateMatch match = calculateSoftScore(worker, distanceKm, emergencyRadius, shift);
+            CandidateMatch match = calculateSoftScore(worker, distanceKm, emergencyRadius, shift, batchCtx);
             matchedCandidates.add(match);
         }
 
+        int createdCount = dispatchTopCandidates(
+                shift,
+                matchedCandidates,
+                needed,
+                true,
+                Duration.ofMinutes(30),
+                batchCtx
+        );
+
+        createdCount += dispatchGroupsForShift(shiftId, true, emergencyRadius);
+
+        log.info("Emergency Dispatch hoàn tất: Đã gửi {} đề xuất khẩn cấp cho ca {}", createdCount, shiftId);
+        return createdCount;
+    }
+
+    private BatchWorkerContextData preloadBatchWorkerContext(Shift shift, List<Worker> workers) {
+        UUID shiftId = shift != null ? shift.getShiftId() : null;
+        List<UUID> workerIds = workers.stream()
+                .map(Worker::getWorkerId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        boolean allowUnitFallback = workers.size() <= 2;
+
+        // 1. Shift skill requirements & names (1-2 queries total)
+        Map<UUID, List<ShiftSkillRequirement>> skillReqsByShiftId = null;
+        Map<UUID, String> skillNamesById = new HashMap<>();
+        if (shift != null && shiftId != null && shiftSkillRequirementRepository != null) {
+            List<ShiftSkillRequirement> reqs = shiftSkillRequirementRepository.findByShiftIdWithSkill(shiftId);
+            skillReqsByShiftId = new HashMap<>();
+            skillReqsByShiftId.put(shiftId, reqs != null ? reqs : Collections.emptyList());
+            if (reqs != null) {
+                for (ShiftSkillRequirement r : reqs) {
+                    if (r.getSkill() != null && r.getSkill().getSkillId() != null) {
+                        skillNamesById.put(r.getSkill().getSkillId(), r.getSkill().getName());
+                    }
+                }
+            }
+        }
+        if (shift != null && shift.getRequiredSkills() != null && shift.getRequiredSkills().length > 0
+                && skillRepository != null) {
+            List<UUID> missingSkillIds = Arrays.stream(shift.getRequiredSkills())
+                    .filter(Objects::nonNull)
+                    .filter(id -> !skillNamesById.containsKey(id))
+                    .distinct()
+                    .toList();
+            if (!missingSkillIds.isEmpty()) {
+                List<Skill> skills = skillRepository.findAllById(missingSkillIds);
+                if (skills != null) {
+                    for (Skill sk : skills) {
+                        if (sk.getSkillId() != null) {
+                            skillNamesById.put(sk.getSkillId(), sk.getName());
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Mutually blocked user IDs with EO (1 query total)
+        UUID eoUserId = (shift != null && shift.getEvent() != null && shift.getEvent().getEventOrganizer() != null
+                && shift.getEvent().getEventOrganizer().getUser() != null)
+                ? shift.getEvent().getEventOrganizer().getUser().getUserId()
+                : null;
+        Set<UUID> blockedUserIdsWithEo = null;
+        if (eoUserId != null && blockListService != null) {
+            Set<UUID> blocked = blockListService.getMutuallyBlockedUserIds(eoUserId);
+            if (blocked != null && (!blocked.isEmpty() || !allowUnitFallback)) {
+                blockedUserIdsWithEo = blocked;
+            }
+        }
+
+        // 3. Batch WorkerSkills (1 query total)
+        Map<UUID, List<WorkerSkill>> skillsByWorkerId = null;
+        if (!workerIds.isEmpty() && workerSkillRepository != null) {
+            List<WorkerSkill> batchSkills = workerSkillRepository.findByWorker_WorkerIdIn(workerIds);
+            if (batchSkills != null && (!batchSkills.isEmpty() || !allowUnitFallback)) {
+                skillsByWorkerId = batchSkills.stream()
+                        .filter(ws -> ws.getWorker() != null && ws.getWorker().getWorkerId() != null)
+                        .collect(Collectors.groupingBy(ws -> ws.getWorker().getWorkerId()));
+            }
+        }
+
+        // 4. Batch WorkerAvailability (1 query total)
+        Map<UUID, List<WorkerAvailability>> availabilityByWorkerId = null;
+        if (!workerIds.isEmpty() && workerAvailabilityRepository != null) {
+            List<WorkerAvailability> batchAvail =
+                    workerAvailabilityRepository.findByWorker_WorkerIdInOrderByDayOfWeekAscStartTimeAsc(workerIds);
+            if (batchAvail != null && (!batchAvail.isEmpty() || !allowUnitFallback)) {
+                availabilityByWorkerId = batchAvail.stream()
+                        .filter(wa -> wa.getWorker() != null && wa.getWorker().getWorkerId() != null)
+                        .collect(Collectors.groupingBy(wa -> wa.getWorker().getWorkerId()));
+            }
+        }
+
+        // 5. Batch conflicting ShiftAssignments (1 query total)
+        Map<UUID, List<ShiftAssignment>> conflictsByWorkerId = null;
+        if (!workerIds.isEmpty() && shiftAssignmentRepository != null && shift != null
+                && shift.getStartTime() != null && shift.getEndTime() != null) {
+            List<AssignmentStatus> activeStatuses = List.of(
+                    AssignmentStatus.CONFIRMED,
+                    AssignmentStatus.CHECKED_IN,
+                    AssignmentStatus.PENDING);
+            List<ShiftAssignment> batchConflicts = shiftAssignmentRepository.findConflictingAssignmentsForWorkers(
+                    workerIds, shift.getStartTime(), shift.getEndTime(), activeStatuses);
+            if (batchConflicts != null && (!batchConflicts.isEmpty() || !allowUnitFallback)) {
+                conflictsByWorkerId = batchConflicts.stream()
+                        .filter(sa -> sa.getWorker() != null && sa.getWorker().getWorkerId() != null)
+                        .collect(Collectors.groupingBy(sa -> sa.getWorker().getWorkerId()));
+            }
+        }
+
+        // 6. Batch last activity for Idle Boost (1 query total)
+        Map<UUID, Instant> lastActivityByWorkerId = null;
+        if (!workerIds.isEmpty() && shiftAssignmentRepository != null) {
+            List<ShiftAssignmentRepository.WorkerLastActivityProjection> batchActivity =
+                    shiftAssignmentRepository.findLastActivityByWorkerIds(workerIds);
+            if (batchActivity != null && (!batchActivity.isEmpty() || !allowUnitFallback)) {
+                lastActivityByWorkerId = new HashMap<>();
+                for (ShiftAssignmentRepository.WorkerLastActivityProjection row : batchActivity) {
+                    if (row.getWorkerId() != null && row.getLastActivity() != null) {
+                        lastActivityByWorkerId.put(row.getWorkerId(), row.getLastActivity());
+                    }
+                }
+            }
+        }
+
+        // 7. Batch existing active proposals & assignments for this shift (2 queries total)
+        Set<UUID> existingWorkerIds = null;
+        if (shiftId != null && dispatchProposalRepository != null && shiftAssignmentRepository != null) {
+            List<UUID> propWorkers = dispatchProposalRepository.findWorkerIdsByShiftIdAndStatusIn(
+                    shiftId, ACTIVE_PROPOSAL_STATUSES);
+            List<ShiftAssignment> existingAssigns = shiftAssignmentRepository.findByShift_ShiftId(shiftId);
+            boolean hasBatchResults = (propWorkers != null && !propWorkers.isEmpty())
+                    || (existingAssigns != null && !existingAssigns.isEmpty());
+            if (hasBatchResults || !allowUnitFallback) {
+                existingWorkerIds = new HashSet<>();
+                if (propWorkers != null) existingWorkerIds.addAll(propWorkers);
+                if (existingAssigns != null) {
+                    existingAssigns.stream()
+                            .filter(sa -> sa.getWorker() != null && sa.getWorker().getWorkerId() != null)
+                            .map(sa -> sa.getWorker().getWorkerId())
+                            .forEach(existingWorkerIds::add);
+                }
+            }
+        }
+
+        // 8. Cache system_configs once per dispatch call (instead of 4 * N)
+        DispatchScoringConfig scoringConfig = new DispatchScoringConfig(
+                clamp(getConfigDouble("matching.neutral_unrated_rating", DEFAULT_NEUTRAL_RATING), 0.0, 5.0),
+                Math.max(0.0, getConfigDouble("fairness.new_worker_boost", 10.0)),
+                Math.max(0.0, getConfigDouble("fairness.idle_worker_boost", 10.0)),
+                (int) Math.max(1.0, getConfigDouble("fairness.idle_days_threshold", DEFAULT_IDLE_DAYS_THRESHOLD))
+        );
+
+        return new BatchWorkerContextData(
+                skillReqsByShiftId,
+                skillNamesById,
+                blockedUserIdsWithEo,
+                eoUserId,
+                skillsByWorkerId,
+                availabilityByWorkerId,
+                conflictsByWorkerId,
+                lastActivityByWorkerId,
+                existingWorkerIds,
+                scoringConfig
+        );
+    }
+
+    private int dispatchTopCandidates(
+            Shift shift,
+            List<CandidateMatch> matchedCandidates,
+            int needed,
+            boolean emergency,
+            Duration ttl,
+            BatchWorkerContextData batchCtx) {
+        UUID shiftId = shift.getShiftId();
         matchedCandidates.sort(Comparator.comparingDouble(CandidateMatch::getFinalScore).reversed()
                 .thenComparingDouble(CandidateMatch::getDistanceKm));
 
-        // Loại ứng viên đã có Proposal PENDING/ACCEPTED hoặc Assignment trước khi lấy
-        // Top N
+        Set<UUID> existingWorkerIds = batchCtx != null ? batchCtx.existingProposalOrAssignmentWorkerIds() : null;
         List<CandidateMatch> eligibleCandidates = matchedCandidates.stream()
-                .filter(candidate -> !hasExistingProposalOrAssignment(shiftId, candidate.getWorker().getWorkerId()))
+                .filter(candidate -> {
+                    UUID wId = candidate.getWorker().getWorkerId();
+                    if (existingWorkerIds != null) {
+                        return !existingWorkerIds.contains(wId);
+                    }
+                    return !hasExistingProposalOrAssignment(shiftId, wId);
+                })
                 .toList();
 
-        int targetDispatchCount = Math.max(needed * 3 + 5, needed);
+        int targetDispatchCount = emergency
+                ? Math.max(needed * 3 + 5, needed)
+                : Math.max(needed * 2 + 3, needed);
         List<CandidateMatch> topCandidates = eligibleCandidates.stream()
                 .limit(targetDispatchCount)
                 .toList();
 
         int createdCount = 0;
-        Instant expiresAt = Instant.now().plus(Duration.ofMinutes(30)); // Khẩn cấp: Hết hạn sau 30 phút
+        Instant expiresAt = Instant.now().plus(ttl);
+        Set<UUID> dispatchedWorkerIds = new HashSet<>();
 
         for (CandidateMatch candidate : topCandidates) {
-            if (!isShiftReadyForProposal(shift, true)) {
+            if (!isShiftReadyForProposal(shift, emergency)) {
+                log.info("Dừng dispatch sớm cho ca {}: ca không còn sẵn sàng hoặc đã đủ nhân sự.", shiftId);
                 break;
             }
             Worker worker = candidate.getWorker();
-            if (hasExistingProposalOrAssignment(shiftId, worker.getWorkerId())) {
+            UUID wId = worker.getWorkerId();
+            if (!dispatchedWorkerIds.add(wId)) {
+                continue;
+            }
+            if (existingWorkerIds == null && hasExistingProposalOrAssignment(shiftId, wId)) {
                 continue;
             }
 
@@ -805,26 +1026,30 @@ public class MatchingDispatchService {
             if (notificationService != null && worker.getUser() != null && worker.getUser().getUserId() != null) {
                 try {
                     String eventName = shift.getEvent() != null ? shift.getEvent().getName() : "Sự kiện CANi";
+                    String title = emergency
+                            ? "🚨 [GẤP] Lời mời nhận ca làm khẩn cấp: " + shift.getJobType()
+                            : "Đề xuất ca làm mới: " + shift.getJobType();
+                    String body = emergency
+                            ? "Ca làm việc khẩn cấp tại \"" + eventName + "\" đang thiếu nhân sự! Thù lao "
+                                    + shift.getHourlyWage() + " đ/giờ."
+                            : "Bạn vừa nhận được lời mời làm việc tại \"" + eventName + "\" với mức thù lao "
+                                    + shift.getHourlyWage() + " đ/giờ.";
+                    String notifType = emergency ? "EMERGENCY_PROPOSAL" : "NEW_PROPOSAL";
                     notificationService.createAndSend(
                             worker.getUser().getUserId(),
-                            "🚨 [GẤP] Lời mời nhận ca làm khẩn cấp: " + shift.getJobType(),
-                            "Ca làm việc khẩn cấp tại \"" + eventName + "\" đang thiếu nhân sự! Thù lao "
-                                    + shift.getHourlyWage() + " đ/giờ.",
+                            title,
+                            body,
                             NotificationType.PROPOSAL,
                             "PROPOSAL",
                             savedProposal != null && savedProposal.getProposalId() != null
                                     ? savedProposal.getProposalId()
                                     : shiftId,
-                            Map.of("shiftId", shiftId.toString(), "type", "EMERGENCY_PROPOSAL"));
+                            Map.of("shiftId", shiftId.toString(), "type", notifType));
                 } catch (Exception ex) {
-                    log.warn("Lỗi gửi thông báo FCM khẩn cấp: {}", ex.getMessage());
+                    log.warn("Không thể gửi thông báo FCM cho đề xuất ca làm: {}", ex.getMessage());
                 }
             }
         }
-
-        createdCount += dispatchGroupsForShift(shiftId, true, emergencyRadius);
-
-        log.info("Emergency Dispatch hoàn tất: Đã gửi {} đề xuất khẩn cấp cho ca {}", createdCount, shiftId);
         return createdCount;
     }
 
@@ -901,6 +1126,49 @@ public class MatchingDispatchService {
                 shiftAssignmentRepository.findWorkerIdsByStatusAndUpdatedAtAfter(AssignmentStatus.NO_SHOW,
                         noShowCutoff));
 
+        // Batch preloads để loại bỏ N+1 trong Group Dispatch
+        List<UUID> leaderIds = candidateGroups.stream()
+                .map(WorkerGroup::getLeaderWorkerId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<UUID, Worker> leadersById = new HashMap<>();
+        if (!leaderIds.isEmpty()) {
+            List<Worker> batchLeaders = workerRepository.findAllById(leaderIds);
+            if (batchLeaders != null && !batchLeaders.isEmpty()) {
+                for (Worker l : batchLeaders) {
+                    if (l != null && l.getWorkerId() != null) {
+                        leadersById.put(l.getWorkerId(), l);
+                    }
+                }
+            }
+        }
+
+        UUID eoUserIdForBlock = (shift.getEvent() != null && shift.getEvent().getEventOrganizer() != null
+                && shift.getEvent().getEventOrganizer().getUser() != null)
+                ? shift.getEvent().getEventOrganizer().getUser().getUserId()
+                : null;
+        Set<UUID> blockedUserIdsWithEo = null;
+        if (eoUserIdForBlock != null && blockListService != null) {
+            Set<UUID> blocked = blockListService.getMutuallyBlockedUserIds(eoUserIdForBlock);
+            if (blocked != null && !blocked.isEmpty()) {
+                blockedUserIdsWithEo = blocked;
+            }
+        }
+
+        List<UUID> existingProposedGroupIdsList = dispatchProposalRepository.findGroupIdsByShiftIdAndStatusIn(
+                shiftId, ACTIVE_PROPOSAL_STATUSES);
+        Set<UUID> existingProposedGroupIds = (existingProposedGroupIdsList != null && !existingProposedGroupIdsList.isEmpty())
+                ? new HashSet<>(existingProposedGroupIdsList)
+                : null;
+
+        List<Worker> allMembers = memberships.stream()
+                .map(WorkerGroupMembership::getWorker)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        BatchWorkerContextData memberBatchCtx = preloadGroupMemberBatchContext(shift, allMembers);
+
         List<GroupCandidate> groupCandidates = new ArrayList<>();
         for (WorkerGroup group : candidateGroups) {
             List<WorkerGroupMembership> groupMemberships = membershipsByGroup.getOrDefault(group.getGroupId(),
@@ -925,7 +1193,9 @@ public class MatchingDispatchService {
             if (group.getLeaderWorkerId() == null) {
                 continue;
             }
-            Worker leader = workerRepository.findById(group.getLeaderWorkerId()).orElse(null);
+            Worker leader = leadersById.containsKey(group.getLeaderWorkerId())
+                    ? leadersById.get(group.getLeaderWorkerId())
+                    : workerRepository.findById(group.getLeaderWorkerId()).orElse(null);
             if (leader == null
                     || !Boolean.TRUE.equals(leader.getIsOnline())
                     || leader.getUser() == null
@@ -934,10 +1204,11 @@ public class MatchingDispatchService {
             }
 
             // Chặn leader nếu đã chặn EO (cùng cách gọi passHardFilter)
-            if (blockListService != null && shift.getEvent() != null && shift.getEvent().getEventOrganizer() != null) {
-                EventOrganizer eo = shift.getEvent().getEventOrganizer();
-                if (eo.getUser() != null && leader.getUser() != null
-                        && blockListService.isEitherBlocked(eo.getUser().getUserId(), leader.getUser().getUserId())) {
+            if (eoUserIdForBlock != null && leader.getUser() != null && blockListService != null) {
+                boolean isLeaderBlocked = blockedUserIdsWithEo != null
+                        ? blockedUserIdsWithEo.contains(leader.getUser().getUserId())
+                        : blockListService.isEitherBlocked(eoUserIdForBlock, leader.getUser().getUserId());
+                if (isLeaderBlocked) {
                     continue;
                 }
             }
@@ -959,9 +1230,11 @@ public class MatchingDispatchService {
                 continue;
             }
 
-            if (!dispatchProposalRepository
-                    .findByShift_ShiftIdAndGroupIdAndStatusIn(shiftId, group.getGroupId(), ACTIVE_PROPOSAL_STATUSES)
-                    .isEmpty()) {
+            if (existingProposedGroupIds != null
+                    ? existingProposedGroupIds.contains(group.getGroupId())
+                    : !dispatchProposalRepository
+                            .findByShift_ShiftIdAndGroupIdAndStatusIn(shiftId, group.getGroupId(), ACTIVE_PROPOSAL_STATUSES)
+                            .isEmpty()) {
                 continue;
             }
 
@@ -969,7 +1242,7 @@ public class MatchingDispatchService {
             List<Worker> eligible = groupMemberships.stream()
                     .map(WorkerGroupMembership::getWorker)
                     .filter(Objects::nonNull)
-                    .filter(w -> isGroupChannelMemberEligible(w, shift))
+                    .filter(w -> groupMemberEligibilityReason(w, shift, memberBatchCtx) == null)
                     .toList();
             if (eligible.size() != packSize) {
                 // 1 thành viên fail -> loại toàn bộ pack, không fallback subset
@@ -1035,7 +1308,9 @@ public class MatchingDispatchService {
                 Set<UUID> reqIds = Arrays.stream(shift.getRequiredSkills()).filter(Objects::nonNull)
                         .collect(Collectors.toSet());
                 boolean verified = eligible.stream().anyMatch(w -> {
-                    List<WorkerSkill> skills = workerSkillRepository.findByWorker_WorkerId(w.getWorkerId());
+                    List<WorkerSkill> skills = (memberBatchCtx != null && memberBatchCtx.skillsByWorkerId() != null)
+                            ? memberBatchCtx.skillsByWorkerId().getOrDefault(w.getWorkerId(), Collections.emptyList())
+                            : workerSkillRepository.findByWorker_WorkerId(w.getWorkerId());
                     return skills != null && skills.stream().anyMatch(ws -> ws.getSkill() != null
                             && reqIds.contains(ws.getSkill().getSkillId())
                             && ws.getVerificationTier() != null
@@ -1159,12 +1434,78 @@ public class MatchingDispatchService {
         return groupMemberEligibilityReason(worker, shift) == null;
     }
 
+    private BatchWorkerContextData preloadGroupMemberBatchContext(Shift shift, List<Worker> members) {
+        if (members == null || members.isEmpty()) {
+            return null;
+        }
+        List<UUID> memberIds = members.stream()
+                .map(Worker::getWorkerId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        boolean allowUnitFallback = memberIds.size() <= 2;
+
+        Map<UUID, List<WorkerSkill>> skillsByWorkerId = null;
+        if (!memberIds.isEmpty() && workerSkillRepository != null) {
+            List<WorkerSkill> batchSkills = workerSkillRepository.findByWorker_WorkerIdIn(memberIds);
+            if (batchSkills != null && (!batchSkills.isEmpty() || !allowUnitFallback)) {
+                skillsByWorkerId = batchSkills.stream()
+                        .filter(ws -> ws.getWorker() != null && ws.getWorker().getWorkerId() != null)
+                        .collect(Collectors.groupingBy(ws -> ws.getWorker().getWorkerId()));
+            }
+        }
+
+        Map<UUID, List<WorkerAvailability>> availabilityByWorkerId = null;
+        if (!memberIds.isEmpty() && workerAvailabilityRepository != null) {
+            List<WorkerAvailability> batchAvail =
+                    workerAvailabilityRepository.findByWorker_WorkerIdInOrderByDayOfWeekAscStartTimeAsc(memberIds);
+            if (batchAvail != null && (!batchAvail.isEmpty() || !allowUnitFallback)) {
+                availabilityByWorkerId = batchAvail.stream()
+                        .filter(wa -> wa.getWorker() != null && wa.getWorker().getWorkerId() != null)
+                        .collect(Collectors.groupingBy(wa -> wa.getWorker().getWorkerId()));
+            }
+        }
+
+        Map<UUID, List<ShiftAssignment>> conflictsByWorkerId = null;
+        if (!memberIds.isEmpty() && shiftAssignmentRepository != null && shift != null
+                && shift.getStartTime() != null && shift.getEndTime() != null) {
+            List<AssignmentStatus> activeStatuses = List.of(
+                    AssignmentStatus.CONFIRMED,
+                    AssignmentStatus.CHECKED_IN,
+                    AssignmentStatus.PENDING);
+            List<ShiftAssignment> batchConflicts = shiftAssignmentRepository.findConflictingAssignmentsForWorkers(
+                    memberIds, shift.getStartTime(), shift.getEndTime(), activeStatuses);
+            if (batchConflicts != null && (!batchConflicts.isEmpty() || !allowUnitFallback)) {
+                conflictsByWorkerId = batchConflicts.stream()
+                        .filter(sa -> sa.getWorker() != null && sa.getWorker().getWorkerId() != null)
+                        .collect(Collectors.groupingBy(sa -> sa.getWorker().getWorkerId()));
+            }
+        }
+
+        return new BatchWorkerContextData(
+                null,
+                null,
+                null,
+                null,
+                skillsByWorkerId,
+                availabilityByWorkerId,
+                conflictsByWorkerId,
+                null,
+                null,
+                null
+        );
+    }
+
     /**
      * Kênh group: trả code lý do thành viên KHÔNG đủ điều kiện; null = đủ điều
      * kiện.
      * Dùng chung: dispatch group và re-check khi leader accept.
      */
     public String groupMemberEligibilityReason(Worker worker, Shift shift) {
+        return groupMemberEligibilityReason(worker, shift, null);
+    }
+
+    private String groupMemberEligibilityReason(Worker worker, Shift shift, BatchWorkerContextData batchCtx) {
         if (worker.getKycStatus() != com.cani.entity.enums.KycStatus.APPROVED) {
             return "KYC_UNAPPROVED";
         }
@@ -1183,7 +1524,9 @@ public class MatchingDispatchService {
                     .filter(Objects::nonNull)
                     .collect(Collectors.toSet());
             if (!requiredSkillIds.isEmpty()) {
-                List<WorkerSkill> workerSkills = workerSkillRepository.findByWorker_WorkerId(worker.getWorkerId());
+                List<WorkerSkill> workerSkills = (batchCtx != null && batchCtx.skillsByWorkerId() != null && worker.getWorkerId() != null)
+                        ? batchCtx.skillsByWorkerId().getOrDefault(worker.getWorkerId(), Collections.emptyList())
+                        : workerSkillRepository.findByWorker_WorkerId(worker.getWorkerId());
                 Set<UUID> haveSkillIds = workerSkills == null ? Collections.emptySet()
                         : workerSkills.stream()
                                 .filter(ws -> ws.getSkill() != null && ws.getSkill().getSkillId() != null)
@@ -1198,9 +1541,11 @@ public class MatchingDispatchService {
                 AssignmentStatus.CONFIRMED,
                 AssignmentStatus.CHECKED_IN,
                 AssignmentStatus.PENDING);
-        List<ShiftAssignment> conflicts = shiftAssignmentRepository.findConflictingAssignments(
-                worker.getWorkerId(), shift.getStartTime(), shift.getEndTime(), activeStatuses);
-        if (!conflicts.isEmpty()) {
+        List<ShiftAssignment> conflicts = (batchCtx != null && batchCtx.conflictsByWorkerId() != null && worker.getWorkerId() != null)
+                ? batchCtx.conflictsByWorkerId().getOrDefault(worker.getWorkerId(), Collections.emptyList())
+                : shiftAssignmentRepository.findConflictingAssignments(
+                        worker.getWorkerId(), shift.getStartTime(), shift.getEndTime(), activeStatuses);
+        if (conflicts != null && !conflicts.isEmpty()) {
             return "SHIFT_CONFLICT";
         }
         if (worker.getMinWage() != null && worker.getMinWage().compareTo(BigDecimal.ZERO) > 0) {
@@ -1208,7 +1553,12 @@ public class MatchingDispatchService {
                 return "WAGE_BELOW_MIN";
             }
         }
-        if (!isShiftCoveredByAvailability(worker, shift)) {
+        boolean availOk = (batchCtx != null && batchCtx.availabilityByWorkerId() != null && worker.getWorkerId() != null)
+                ? isShiftCoveredByAvailabilitySlots(
+                        batchCtx.availabilityByWorkerId().getOrDefault(worker.getWorkerId(), Collections.emptyList()),
+                        shift)
+                : isShiftCoveredByAvailability(worker, shift);
+        if (!availOk) {
             return "UNAVAILABLE";
         }
         return null;

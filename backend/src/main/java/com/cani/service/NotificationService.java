@@ -96,8 +96,13 @@ public class NotificationService {
         Notification saved = notificationRepository.save(notification);
         log.info("[NotificationService] In-App Notification saved for user {}: {}", targetUserId, title);
 
+        Map<String, String> fcmData = dataPayload != null ? new java.util.HashMap<>(dataPayload) : new java.util.HashMap<>();
+        if (saved != null && saved.getNotificationId() != null) {
+            fcmData.putIfAbsent("notificationId", saved.getNotificationId().toString());
+        }
+
         // 2. Bắn Push Notification qua Firebase (Kênh tức thời - Lockscreen) sau khi transaction commit
-        dispatchPushAfterCommit(targetUserId, title, body, dataPayload);
+        dispatchPushAfterCommit(targetUserId, title, body, fcmData);
 
         return saved;
     }

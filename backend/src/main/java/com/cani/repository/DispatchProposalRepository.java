@@ -44,4 +44,10 @@ public interface DispatchProposalRepository extends JpaRepository<DispatchPropos
     List<DispatchProposal> findByStatusAndGroupIdIsNotNullAndCreatedAtAfter(ProposalStatus status, Instant after);
     List<DispatchProposal> findByShift_ShiftIdAndGroupIdAndStatusIn(UUID shiftId, UUID groupId, List<ProposalStatus> statuses);
     List<DispatchProposal> findByGroupIdAndStatus(UUID groupId, ProposalStatus status);
+
+    @Query("SELECT DISTINCT dp.worker.workerId FROM DispatchProposal dp WHERE dp.shift.shiftId = :shiftId AND dp.worker IS NOT NULL AND dp.status IN :statuses")
+    List<UUID> findWorkerIdsByShiftIdAndStatusIn(@Param("shiftId") UUID shiftId, @Param("statuses") Collection<ProposalStatus> statuses);
+
+    @Query("SELECT DISTINCT dp.groupId FROM DispatchProposal dp WHERE dp.shift.shiftId = :shiftId AND dp.groupId IS NOT NULL AND dp.status IN :statuses")
+    List<UUID> findGroupIdsByShiftIdAndStatusIn(@Param("shiftId") UUID shiftId, @Param("statuses") Collection<ProposalStatus> statuses);
 }

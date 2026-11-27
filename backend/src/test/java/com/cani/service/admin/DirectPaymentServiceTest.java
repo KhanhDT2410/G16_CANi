@@ -234,7 +234,7 @@ class DirectPaymentServiceTest {
         when(paymentRepository.findByAssignmentId(assignment.getAssignmentId())).thenReturn(Optional.of(initialPayment));
 
         assertThatThrownBy(() -> directPaymentService.confirmPayment(strangerWorkerId, assignment.getAssignmentId(), request))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(com.cani.exception.AppException.class)
                 .hasMessageContaining("Bạn không có quyền xác nhận thanh toán này");
     }
 

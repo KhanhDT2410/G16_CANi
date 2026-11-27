@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:dio/dio.dart';
@@ -16,6 +17,23 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 class FcmService {
   FcmService._();
+
+  static const int _maxDisplayedIds = 200;
+  static final LinkedHashSet<String> _displayedNotificationIds = LinkedHashSet<String>();
+
+  static void markNotificationDisplayed(String? id) {
+    if (id == null || id.isEmpty) return;
+    _displayedNotificationIds.remove(id);
+    _displayedNotificationIds.add(id);
+    while (_displayedNotificationIds.length > _maxDisplayedIds) {
+      _displayedNotificationIds.remove(_displayedNotificationIds.first);
+    }
+  }
+
+  static bool hasDisplayedNotification(String? id) {
+    if (id == null || id.isEmpty) return false;
+    return _displayedNotificationIds.contains(id);
+  }
 
   static bool _isCoreInitialized = false;
   static bool _isPostFrameInitialized = false;
@@ -78,14 +96,23 @@ class FcmService {
       // 4. Lắng nghe thông báo khi ứng dụng đang mở ở tiền cảnh (Foreground)
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         debugPrint('[FcmService] Foreground message received: ${message.notification?.title}');
+        final backendNotifId = message.data['notificationId']?.toString();
+        if (hasDisplayedNotification(backendNotifId)) {
+          debugPrint('[FcmService] Skipping duplicate foreground notification: $backendNotifId');
+          return;
+        }
         if (_shouldSuppressForegroundNotification?.call(message.data) ?? false) {
           debugPrint('[FcmService] Suppressed foreground job notification while Nhận việc is OFF.');
           return;
         }
+        markNotificationDisplayed(backendNotifId);
         final noti = message.notification;
         if (noti != null) {
+          final displayId = (backendNotifId != null && backendNotifId.isNotEmpty)
+              ? backendNotifId.hashCode
+              : message.hashCode;
           LocalNotificationService.showNotification(
-            id: message.hashCode,
+            id: displayId,
             title: noti.title ?? 'CANi - Thông báo mới',
             body: noti.body ?? 'Bạn có thông báo mới từ hệ thống CANi',
             payload: jsonEncode(message.data),
@@ -168,6 +195,7 @@ class FcmService {
   /// Lưu payload điều hướng vào bộ đệm nếu Navigator hoặc AuthState chưa sẵn sàng,
   /// và chỉ thực thi khi cả hai đã khởi tạo xong.
   static void handleOrBufferNavigation(Map<String, dynamic> data) {
+    markNotificationDisplayed(data['notificationId']?.toString());
     _pendingNavigationData = Map<String, dynamic>.from(data);
     flushPendingNavigation();
   }

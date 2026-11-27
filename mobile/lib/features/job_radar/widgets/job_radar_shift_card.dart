@@ -311,8 +311,8 @@ class _JobRadarUnifiedBottomCardState extends ConsumerState<JobRadarUnifiedBotto
     final activeProposals = proposals.where((p) => p.isActiveAt(now)).toList();
     final notifier = ref.read(jobRadarProvider.notifier);
 
-    // 1. Nếu Worker chủ động chạm một marker hợp lệ trên bản đồ -> cập nhật thẻ theo ca đó
-    if (shiftSlice.selectedShift != null) {
+    // 1. Nếu Worker chủ động chạm một marker hợp lệ trên bản đồ -> cập nhật thẻ theo ca đó (chỉ hiển thị ca khẩn cấp)
+    if (shiftSlice.selectedShift != null && shiftSlice.selectedShift!.emergency) {
       final selected = shiftSlice.selectedShift!;
       return RadarSlidingJobCard(
         shift: selected,
@@ -385,13 +385,13 @@ class _JobRadarUnifiedBottomCardState extends ConsumerState<JobRadarUnifiedBotto
       );
     }
 
-    // 3. Nếu chỉ có ca Matching thường quanh bạn khi đang Bật nhận việc -> giữ thẻ "Ca gần bạn"
-    if (shiftSlice.isOnline && shiftSlice.nearbyShifts.isNotEmpty) {
-      final firstShift = shiftSlice.nearbyShifts.first;
+    // 3. Fallback: Nếu còn ca khẩn cấp chưa nằm trong carousel -> hiển thị ca đầu tiên
+    final firstEmergency = shiftSlice.nearbyShifts.where((s) => s.emergency).firstOrNull;
+    if (shiftSlice.isOnline && firstEmergency != null) {
       return RadarSlidingJobCard(
-        shift: firstShift,
-        onViewDetails: () => showJobRadarShiftDetails(context, ref, firstShift),
-        onApply: () => applyQuickForRadarShift(context, ref, firstShift),
+        shift: firstEmergency,
+        onViewDetails: () => showJobRadarShiftDetails(context, ref, firstEmergency),
+        onApply: () => applyQuickForRadarShift(context, ref, firstEmergency),
       );
     }
 

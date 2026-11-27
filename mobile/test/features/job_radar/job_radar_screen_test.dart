@@ -527,4 +527,23 @@ void main() {
     expect(find.text('Bạn đã có ca nhận rồi'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('Non-emergency matching shifts are hidden from Radar (no Chờ lời mời card or marker)', (tester) async {
+    final proposalRepo = _FakeProposalRepository();
+    final radarRepo = _FakeJobRadarRepository()
+      ..shifts = [
+        _makeShift('s-normal', eventName: 'Sự Kiện Matching Thường', emergency: false),
+      ];
+
+    final container = await _pumpRadarScreen(tester, proposalRepo: proposalRepo, radarRepo: radarRepo);
+    addTearDown(container.dispose);
+
+    // Should NOT show non-emergency shifts on map or card
+    expect(find.text('Ca gần bạn'), findsNothing);
+    expect(find.text('Sự Kiện Matching Thường'), findsNothing);
+    expect(find.text('Chờ lời mời'), findsNothing);
+    expect(find.text('Đang tìm ca quanh bạn'), findsOneWidget);
+    expect(find.text('DS (0)'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

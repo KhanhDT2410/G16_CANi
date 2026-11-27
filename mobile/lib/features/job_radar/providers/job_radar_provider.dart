@@ -442,6 +442,7 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
 
       final shifts = rawShifts
           .where((s) => !_dismissedShiftIds.contains(s.shiftId))
+          .where((s) => s.emergency)
           .toList();
 
       NearbyShiftItem? resolvedSelection;

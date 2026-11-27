@@ -51,4 +51,9 @@ public class NearbyShiftResponseDto {
 
     @Builder.Default
     private Boolean emergency = false;
+
+    @Builder.Default
+    private BigDecimal emergencyBonus = BigDecimal.ZERO;
+
+    private String emergencySkillRelaxation;
 }

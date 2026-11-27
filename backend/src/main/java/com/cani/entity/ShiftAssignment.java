@@ -9,6 +9,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -97,6 +98,10 @@ public class ShiftAssignment {
 
     @Column(name = "invite_override_reason", columnDefinition = "TEXT")
     private String inviteOverrideReason;
+
+    @Column(name = "emergency_bonus", nullable = false, precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal emergencyBonus = BigDecimal.ZERO;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

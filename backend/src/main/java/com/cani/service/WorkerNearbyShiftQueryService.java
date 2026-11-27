@@ -252,12 +252,16 @@ public class WorkerNearbyShiftQueryService {
             Double sLat = s.getLocationLat() != null ? s.getLocationLat() : (s.getEvent() != null ? s.getEvent().getVenueLat() : null);
             Double sLng = s.getLocationLng() != null ? s.getLocationLng() : (s.getEvent() != null ? s.getEvent().getVenueLng() : null);
 
-            if (sLat == null || sLng == null || !isWithinBoundingBox(centerLat, centerLng, searchRadius, sLat, sLng)) {
+            double effectiveSearchRadius = Boolean.TRUE.equals(s.getEmergency())
+                    ? Math.max(searchRadius, resolveEmergencyRadius(s))
+                    : searchRadius;
+
+            if (sLat == null || sLng == null || !isWithinBoundingBox(centerLat, centerLng, effectiveSearchRadius, sLat, sLng)) {
                 continue;
             }
 
             double distance = MatchingDispatchService.calculateDistance(centerLat, centerLng, sLat, sLng);
-            if (distance <= searchRadius) {
+            if (distance <= effectiveSearchRadius) {
                 matchedCandidates.add(new NearbyShiftCandidate(s, distance, sLat, sLng));
             }
         }
@@ -418,10 +422,24 @@ public class WorkerNearbyShiftQueryService {
                     .isConflicting(isConflicting)
                     .conflictReason(conflictReason)
                     .emergency(Boolean.TRUE.equals(s.getEmergency()))
+                    .emergencyBonus(Boolean.TRUE.equals(s.getEmergency()) && s.getEmergencyBonus() != null
+                            ? s.getEmergencyBonus()
+                            : java.math.BigDecimal.ZERO)
+                    .emergencySkillRelaxation(Boolean.TRUE.equals(s.getEmergency()) && s.getEmergencySkillRelaxation() != null
+                            ? s.getEmergencySkillRelaxation().name()
+                            : null)
                     .build());
         }
 
         nearbyList.sort(Comparator.comparingDouble(NearbyShiftResponseDto::getDistanceKm));
         return nearbyList;
+    }
+
+    private double resolveEmergencyRadius(Shift s) {
+        if (s != null && s.getEmergencyRadiusKm() != null && Double.isFinite(s.getEmergencyRadiusKm())
+                && s.getEmergencyRadiusKm() > 0) {
+            return Math.min(50.0, Math.max(1.0, s.getEmergencyRadiusKm()));
+        }
+        return ShiftStaffingPolicy.DEFAULT_EMERGENCY_RADIUS_KM;
     }
 }

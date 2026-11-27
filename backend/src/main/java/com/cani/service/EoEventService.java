@@ -8,6 +8,7 @@ import com.cani.entity.*;
 import com.cani.entity.enums.AssignmentStatus;
 import com.cani.entity.enums.City;
 import com.cani.entity.enums.DisputeStatus;
+import com.cani.entity.enums.EmergencySkillRelaxation;
 import com.cani.entity.enums.EventMode;
 import com.cani.entity.enums.EventStatus;
 import com.cani.entity.enums.NoShowDetectedBy;
@@ -791,7 +792,8 @@ public class EoEventService {
         log.info("EO {} đã duyệt hoàn thành ca cho Assignment {} (inShiftAwaitingCheckout={})", userId, assignmentId,
                 isInShiftAwaitingCheckout);
 
-        BigDecimal agreedWage = calculateSingleWorkerAgreedWage(shift);
+        BigDecimal assignmentBonus = sa.getEmergencyBonus() != null ? sa.getEmergencyBonus() : BigDecimal.ZERO;
+        BigDecimal agreedWage = calculateSingleWorkerAgreedWage(shift).add(assignmentBonus);
 
         // WBS 246.0: Tính toán tiền công thực tế từ số giờ làm việc thực tế (Actual
         // Hours & Payment)
@@ -800,8 +802,10 @@ public class EoEventService {
             BigDecimal hourly = shift.getHourlyWage();
             BigDecimal allowance = shift.getAllowance() != null ? shift.getAllowance() : BigDecimal.ZERO;
             if (attOpt.get().getHoursWorked() != null) {
-                actualAmount = hourly.multiply(attOpt.get().getHoursWorked()).add(allowance).setScale(0,
-                        RoundingMode.HALF_UP);
+                actualAmount = hourly.multiply(attOpt.get().getHoursWorked())
+                        .add(allowance)
+                        .add(assignmentBonus)
+                        .setScale(0, RoundingMode.HALF_UP);
             } else if (attOpt.get().getCheckinTime() != null) {
                 Instant checkin = attOpt.get().getCheckinTime();
                 Instant now = Instant.now();
@@ -810,7 +814,10 @@ public class EoEventService {
                 long minutes = Math.max(30, Duration.between(checkin, effectiveEnd).toMinutes());
                 BigDecimal hoursWorked = BigDecimal.valueOf(minutes).divide(BigDecimal.valueOf(60), 2,
                         RoundingMode.HALF_UP);
-                actualAmount = hourly.multiply(hoursWorked).add(allowance).setScale(0, RoundingMode.HALF_UP);
+                actualAmount = hourly.multiply(hoursWorked)
+                        .add(allowance)
+                        .add(assignmentBonus)
+                        .setScale(0, RoundingMode.HALF_UP);
             }
         }
 
@@ -1296,6 +1303,16 @@ public class EoEventService {
      */
     @Transactional
     public Map<String, Object> triggerEmergencyDispatchWithDetails(UUID userId, UUID shiftId, Double customRadiusKm) {
+        return triggerEmergencyDispatchWithOptions(userId, shiftId,
+                EmergencyDispatchRequestDto.builder().radiusKm(customRadiusKm).build());
+    }
+
+    @Transactional
+    public Map<String, Object> triggerEmergencyDispatchWithOptions(
+            UUID userId,
+            UUID shiftId,
+            EmergencyDispatchRequestDto request
+    ) {
         EventOrganizer eo = getEoOrThrow(userId);
         Shift shift = shiftRepository.findByIdForUpdate(shiftId)
                 .orElseGet(() -> shiftRepository.findById(shiftId)
@@ -1306,6 +1323,8 @@ public class EoEventService {
             throw new BadRequestException("Bạn không có quyền thao tác trên ca làm việc này");
         }
 
+        validateEmergencyRequest(request);
+
         ShiftStaffingPolicy policy = getStaffingPolicy();
         ShiftStaffingPolicy.EmergencyEligibility eligibility = policy.evaluateEmergencyEligibility(shift,
                 Instant.now());
@@ -1313,58 +1332,177 @@ public class EoEventService {
             throw new BadRequestException(eligibility.blockReason());
         }
 
-        double effectiveRadiusKm = policy.resolveEffectiveEmergencyRadiusKm(customRadiusKm);
-        shift.setEmergency(true);
+        Double requestedRadius = resolveRequestedRadius(request);
+        double effectiveRadiusKm = policy.resolveEffectiveEmergencyRadiusKm(requestedRadius);
+        applyEmergencySettings(shift, policy, effectiveRadiusKm, request, false);
         shiftRepository.save(shift);
 
         int dispatched = matchingDispatchService.triggerEmergencyDispatch(shiftId, effectiveRadiusKm);
-        log.info("EO {} kích hoạt Emergency Dispatch cho ca {} (radius={}km): Đã gửi {} đề xuất",
-                eo.getEoId(), shiftId, effectiveRadiusKm, dispatched);
+        log.info("EO {} kích hoạt Emergency Dispatch cho ca {} (radius={}km, relax={}, bonus={}): Đã gửi {} đề xuất",
+                eo.getEoId(), shiftId, effectiveRadiusKm, shift.getEmergencySkillRelaxation(),
+                shift.getEmergencyBonus(), dispatched);
 
-        // Ticket EO-011: Đồng bộ thông báo trạng thái điều phối khẩn cấp vào
-        // Notification Bell của EO
-        if (notificationService != null && eo.getUser() != null && eo.getUser().getUserId() != null) {
-            try {
-                String evName = (shift.getEvent() != null && shift.getEvent().getName() != null)
-                        ? shift.getEvent().getName()
-                        : "Sự kiện";
-                String radiusLabel = (effectiveRadiusKm == Math.rint(effectiveRadiusKm))
-                        ? String.valueOf((long) effectiveRadiusKm)
-                        : String.valueOf(effectiveRadiusKm);
-                String notifTitle = "🚨 [ĐIỀU PHỐI KHẨN CẤP] Đã kích hoạt cho ca " + shift.getJobType();
-                String notifBody = dispatched > 0
-                        ? String.format(
-                                "Đã mở rộng bán kính tìm kiếm %s km cho ca \"%s\" (%s) và gửi %d đề xuất khẩn cấp đến nhân sự phù hợp theo tiêu chí đã cài đặt.",
-                                radiusLabel, shift.getJobType(), evName, dispatched)
-                        : String.format(
-                                "Đã mở rộng bán kính tìm kiếm %s km cho ca \"%s\" (%s). Hệ thống đang tiếp tục quét nhân sự trực tuyến phù hợp.",
-                                radiusLabel, shift.getJobType(), evName);
+        notifyEoEmergencyActivated(eo, shift, effectiveRadiusKm, dispatched, false);
+        return buildEmergencyDispatchResult(shift, effectiveRadiusKm, dispatched, eligibility.missingWorkers());
+    }
 
-                notificationService.createAndSend(
-                        eo.getUser().getUserId(),
-                        notifTitle,
-                        notifBody,
-                        NotificationType.REMINDER,
-                        "SHIFT",
-                        shiftId,
-                        Map.of(
-                                "eventId", shift.getEvent() != null ? shift.getEvent().getEventId().toString() : "",
-                                "shiftId", shiftId.toString(),
-                                "type", "EMERGENCY_DISPATCH_ACTIVE",
-                                "dispatchedCount", String.valueOf(dispatched),
-                                "radiusKm", radiusLabel));
-            } catch (Exception ex) {
-                log.warn("Lỗi gửi thông báo kích hoạt Emergency Dispatch cho EO: {}", ex.getMessage());
-            }
+    /**
+     * UC-59: EO cập nhật cấu hình (bán kính, nới lỏng kỹ năng, phụ cấp) và quét lại khẩn cấp (có cooldown)
+     */
+    @Transactional
+    public Map<String, Object> redispatchEmergencyDispatch(
+            UUID userId,
+            UUID shiftId,
+            EmergencyDispatchRequestDto request
+    ) {
+        EventOrganizer eo = getEoOrThrow(userId);
+        Shift shift = shiftRepository.findByIdForUpdate(shiftId)
+                .orElseGet(() -> shiftRepository.findById(shiftId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Ca làm việc", "id", shiftId)));
+
+        if (shift.getEvent() == null || shift.getEvent().getEventOrganizer() == null
+                || !shift.getEvent().getEventOrganizer().getEoId().equals(eo.getEoId())) {
+            throw new BadRequestException("Bạn không có quyền thao tác trên ca làm việc này");
         }
 
+        validateEmergencyRequest(request);
+
+        ShiftStaffingPolicy policy = getStaffingPolicy();
+        Instant now = Instant.now();
+        ShiftStaffingPolicy.RedispatchEligibility redispatchCheck = policy.evaluateRedispatchEligibility(shift, now);
+        if (!redispatchCheck.canRedispatch()) {
+            throw new BadRequestException(redispatchCheck.blockReason());
+        }
+
+        Double requestedRadius = resolveRequestedRadius(request);
+        Double fallbackRadius = requestedRadius != null ? requestedRadius : shift.getEmergencyRadiusKm();
+        double effectiveRadiusKm = policy.resolveEffectiveEmergencyRadiusKm(fallbackRadius);
+        applyEmergencySettings(shift, policy, effectiveRadiusKm, request, true);
+        shiftRepository.save(shift);
+
+        int dispatched = matchingDispatchService.triggerEmergencyDispatch(shiftId, effectiveRadiusKm);
+        log.info("EO {} quét lại Emergency Dispatch cho ca {} (radius={}km, relax={}, bonus={}): Đã gửi {} đề xuất mới",
+                eo.getEoId(), shiftId, effectiveRadiusKm, shift.getEmergencySkillRelaxation(),
+                shift.getEmergencyBonus(), dispatched);
+
+        notifyEoEmergencyActivated(eo, shift, effectiveRadiusKm, dispatched, true);
+        int missing = Math.max(0, policy.resolveRequiredWorkers(shift) - policy.resolveConfirmedWorkersCount(shift));
+        return buildEmergencyDispatchResult(shift, effectiveRadiusKm, dispatched, missing);
+    }
+
+    private void validateEmergencyRequest(EmergencyDispatchRequestDto request) {
+        if (request == null) {
+            return;
+        }
+        if (request.getMinReliabilityScore() != null && request.getMinReliabilityScore() < 50) {
+            throw new BadRequestException("Điểm uy tín tối thiểu trong chế độ khẩn cấp không được thấp hơn 50.");
+        }
+        if (request.getEmergencyBonus() != null && request.getEmergencyBonus().compareTo(BigDecimal.ZERO) < 0) {
+            throw new BadRequestException("Phụ cấp khẩn cấp không được là số âm.");
+        }
+    }
+
+    private Double resolveRequestedRadius(EmergencyDispatchRequestDto request) {
+        if (request == null) {
+            return null;
+        }
+        return request.getRadiusKm() != null ? request.getRadiusKm() : request.getExpandedRadiusKm();
+    }
+
+    private void applyEmergencySettings(
+            Shift shift,
+            ShiftStaffingPolicy policy,
+            double effectiveRadiusKm,
+            EmergencyDispatchRequestDto request,
+            boolean keepExistingWhenNull
+    ) {
+        shift.setEmergency(true);
+        shift.setEmergencyRadiusKm(effectiveRadiusKm);
+        shift.setEmergencyTriggeredAt(Instant.now());
+
+        if (request != null && request.getSkillRelaxation() != null) {
+            shift.setEmergencySkillRelaxation(policy.sanitizeSkillRelaxation(shift, request.getSkillRelaxation()));
+        } else if (!keepExistingWhenNull || shift.getEmergencySkillRelaxation() == null) {
+            shift.setEmergencySkillRelaxation(EmergencySkillRelaxation.NONE);
+        }
+
+        if (request != null && request.getMinReliabilityScore() != null) {
+            shift.setEmergencyMinRs(policy.sanitizeEmergencyMinRs(shift, request.getMinReliabilityScore()));
+        } else if (!keepExistingWhenNull) {
+            shift.setEmergencyMinRs(null);
+        }
+
+        if (request != null && request.getEmergencyBonus() != null) {
+            shift.setEmergencyBonus(request.getEmergencyBonus().max(BigDecimal.ZERO).setScale(0, RoundingMode.HALF_UP));
+        } else if (!keepExistingWhenNull || shift.getEmergencyBonus() == null) {
+            shift.setEmergencyBonus(BigDecimal.ZERO);
+        }
+    }
+
+    private void notifyEoEmergencyActivated(
+            EventOrganizer eo,
+            Shift shift,
+            double effectiveRadiusKm,
+            int dispatched,
+            boolean isRedispatch
+    ) {
+        if (notificationService == null || eo.getUser() == null || eo.getUser().getUserId() == null) {
+            return;
+        }
+        try {
+            String evName = (shift.getEvent() != null && shift.getEvent().getName() != null)
+                    ? shift.getEvent().getName()
+                    : "Sự kiện";
+            String radiusLabel = (effectiveRadiusKm == Math.rint(effectiveRadiusKm))
+                    ? String.valueOf((long) effectiveRadiusKm)
+                    : String.valueOf(effectiveRadiusKm);
+            String notifTitle = (isRedispatch ? "🔄 [QUÉT LẠI KHẨN CẤP] " : "🚨 [ĐIỀU PHỐI KHẨN CẤP] ")
+                    + "Đã kích hoạt cho ca " + shift.getJobType();
+            String notifBody = dispatched > 0
+                    ? String.format(
+                            "Đã mở rộng bán kính tìm kiếm %s km cho ca \"%s\" (%s) và gửi %d đề xuất khẩn cấp đến nhân sự phù hợp.",
+                            radiusLabel, shift.getJobType(), evName, dispatched)
+                    : String.format(
+                            "Đã mở rộng bán kính tìm kiếm %s km cho ca \"%s\" (%s). Hệ thống đang tiếp tục quét nhân sự trực tuyến phù hợp.",
+                            radiusLabel, shift.getJobType(), evName);
+
+            notificationService.createAndSend(
+                    eo.getUser().getUserId(),
+                    notifTitle,
+                    notifBody,
+                    NotificationType.REMINDER,
+                    "SHIFT",
+                    shift.getShiftId(),
+                    Map.of(
+                            "eventId", shift.getEvent() != null ? shift.getEvent().getEventId().toString() : "",
+                            "shiftId", shift.getShiftId().toString(),
+                            "type", "EMERGENCY_DISPATCH_ACTIVE",
+                            "dispatchedCount", String.valueOf(dispatched),
+                            "radiusKm", radiusLabel));
+        } catch (Exception ex) {
+            log.warn("Lỗi gửi thông báo kích hoạt Emergency Dispatch cho EO: {}", ex.getMessage());
+        }
+    }
+
+    private Map<String, Object> buildEmergencyDispatchResult(
+            Shift shift,
+            double effectiveRadiusKm,
+            int dispatched,
+            int missingWorkers
+    ) {
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("shiftId", shiftId);
+        result.put("shiftId", shift.getShiftId());
         result.put("dispatchedCount", dispatched);
         result.put("emergency", true);
         result.put("effectiveRadiusKm", effectiveRadiusKm);
+        result.put("emergencySkillRelaxation", shift.getEmergencySkillRelaxation() != null
+                ? shift.getEmergencySkillRelaxation().name()
+                : EmergencySkillRelaxation.NONE.name());
+        result.put("emergencyMinRs", shift.getEmergencyMinRs());
+        result.put("emergencyBonus", shift.getEmergencyBonus() != null ? shift.getEmergencyBonus() : BigDecimal.ZERO);
+        result.put("emergencyTriggeredAt", shift.getEmergencyTriggeredAt());
         result.put("hasCandidates", dispatched > 0);
-        result.put("missingWorkers", eligibility.missingWorkers());
+        result.put("missingWorkers", missingWorkers);
         return result;
     }
 
@@ -1380,6 +1518,11 @@ public class EoEventService {
         EventOrganizer eo = getEoOrThrow(userId);
         Shift shift = getOwnedShiftOrThrow(shiftId, eo.getEoId());
         shift.setEmergency(false);
+        shift.setEmergencyRadiusKm(null);
+        shift.setEmergencySkillRelaxation(EmergencySkillRelaxation.NONE);
+        shift.setEmergencyMinRs(null);
+        shift.setEmergencyBonus(BigDecimal.ZERO);
+        shift.setEmergencyTriggeredAt(null);
         shiftRepository.save(shift);
         log.info("EO {} đã tắt chế độ Emergency Dispatch cho ca {}", eo.getEoId(), shiftId);
 
@@ -1963,10 +2106,12 @@ public class EoEventService {
                 shift = safeShiftsById.values().iterator().next();
             }
 
-            BigDecimal agreedWage = (shift != null && shift.getShiftId() != null
+            BigDecimal baseAgreedWage = (shift != null && shift.getShiftId() != null
                     && wageByShiftId.containsKey(shift.getShiftId()))
                             ? wageByShiftId.get(shift.getShiftId())
                             : calculateSingleWorkerAgreedWage(shift);
+            BigDecimal assignmentBonus = sa.getEmergencyBonus() != null ? sa.getEmergencyBonus() : BigDecimal.ZERO;
+            BigDecimal agreedWage = baseAgreedWage.add(assignmentBonus);
             String checklistSummary = computeChecklistSummary(shift != null ? shift.getChecklist() : null,
                     sa.getChecklistProgress());
 

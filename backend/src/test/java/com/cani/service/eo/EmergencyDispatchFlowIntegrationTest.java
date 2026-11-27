@@ -1,7 +1,9 @@
 package com.cani.service.eo;
 
 import com.cani.dto.admin.noshow.NoShowScanResultDto;
+import com.cani.dto.event.EmergencyDispatchRequestDto;
 import com.cani.dto.event.ShiftResponseDto;
+import com.cani.dto.worker.ShiftAssignmentResponseDto;
 import com.cani.entity.*;
 import com.cani.entity.enums.*;
 import com.cani.exception.BadRequestException;
@@ -47,6 +49,10 @@ class EmergencyDispatchFlowIntegrationTest {
     @Autowired private EoEventService eoEventService;
     @Autowired private NoShowService noShowService;
     @Autowired private WorkerJobService workerJobService;
+    @Autowired private PaymentRepository paymentRepository;
+    @Autowired private SkillRepository skillRepository;
+    @Autowired private WorkerSkillRepository workerSkillRepository;
+    @Autowired private ShiftSkillRequirementRepository shiftSkillRequirementRepository;
 
     @Test
     @DisplayName("E2E: Quét thiếu người theo đợt, đọc thông báo giữ cảnh báo sự kiện, và chống bấm đúp/đồng thời")
@@ -428,6 +434,101 @@ class EmergencyDispatchFlowIntegrationTest {
                 .status(ShiftStatus.CANCELLED).emergency(false).build());
         assertThrows(BadRequestException.class,
                 () -> eoEventService.triggerEmergencyDispatchWithDetails(eoUser.getUserId(), cancelled.getShiftId(), 25.0));
+    }
+
+    @Test
+    @DisplayName("Tiered Relaxation + Emergency Bonus + Redispatch Cooldown + Disable Reset")
+    void tieredRelaxation_BonusSnapshot_CooldownAndDisable() {
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        User eoUser = saveUser("eo-adv-" + suffix, UserRole.EVENT_ORGANIZER);
+        EventOrganizer eo = eventOrganizerRepository.save(EventOrganizer.builder()
+                .user(eoUser).companyName("EO Adv Co").verificationStatus(VerificationStatus.APPROVED).build());
+
+        Skill serviceSkill = skillRepository.save(Skill.builder()
+                .name("Phục vụ sự kiện " + suffix)
+                .category("SERVICE")
+                .isActive(true)
+                .build());
+
+        // Worker cách ~34km, RS = 56 (< 60 mặc định), chỉ có SELF_DECLARED (thấp hơn AI_DOCUMENT)
+        User wUser = saveUser("wk-adv-" + suffix, UserRole.WORKER);
+        Worker w = workerRepository.save(Worker.builder()
+                .user(wUser)
+                .fullName("Worker Far Relaxed")
+                .kycStatus(KycStatus.APPROVED)
+                .isOnline(true)
+                .baseLat(11.0800)
+                .baseLng(106.7009)
+                .reliabilityScore(56)
+                .minWage(BigDecimal.ZERO)
+                .build());
+        workerSkillRepository.save(WorkerSkill.builder()
+                .worker(w)
+                .skill(serviceSkill)
+                .verificationTier(VerificationTier.SELF_DECLARED)
+                .build());
+
+        Instant now = Instant.now();
+        Event ev = eventRepository.save(Event.builder()
+                .eventOrganizer(eo)
+                .name("Event Adv " + suffix)
+                .venueAddress("Quận 1, TP.HCM")
+                .venueLat(10.7769).venueLng(106.7009)
+                .eventDate(LocalDate.now())
+                .startTime(now.plus(Duration.ofHours(2)))
+                .endTime(now.plus(Duration.ofHours(6)))
+                .mode(EventMode.MATCHING)
+                .status(EventStatus.ACTIVE)
+                .totalShifts(1).totalRequiredWorkers(2).totalConfirmedWorkers(0)
+                .build());
+
+        Shift shift = shiftRepository.save(Shift.builder()
+                .event(ev)
+                .jobType("Phục vụ bàn")
+                .startTime(now.plus(Duration.ofHours(2)))
+                .endTime(now.plus(Duration.ofHours(6)))
+                .requiredWorkers(2).confirmedWorkers(0).remainingWorkers(2)
+                .hourlyWage(BigDecimal.valueOf(50000))
+                .minReliabilityScore(60)
+                .locationLat(10.7769).locationLng(106.7009)
+                .status(ShiftStatus.ACTIVE).emergency(false)
+                .build());
+        shiftSkillRequirementRepository.save(ShiftSkillRequirement.builder()
+                .shift(shift)
+                .skill(serviceSkill)
+                .requirementType(SkillRequirementType.REQUIRED)
+                .minVerificationTier(VerificationTier.AI_DOCUMENT)
+                .requiresValidCertificate(false)
+                .build());
+
+        // 1. Kích hoạt với radius 40km, LOWER_TIER, minRS=55, bonus=50000 -> gửi proposal thành công
+        EmergencyDispatchRequestDto req = EmergencyDispatchRequestDto.builder()
+                .radiusKm(40.0)
+                .skillRelaxation(EmergencySkillRelaxation.LOWER_TIER)
+                .minReliabilityScore(55)
+                .emergencyBonus(BigDecimal.valueOf(50000))
+                .build();
+        Map<String, Object> res = eoEventService.triggerEmergencyDispatchWithOptions(eoUser.getUserId(), shift.getShiftId(), req);
+        assertEquals(true, res.get("emergency"));
+        assertTrue(((Number) res.get("dispatchedCount")).intValue() >= 1);
+
+        // 2. Worker nhận ca -> snapshot emergencyBonus = 50000 vào ShiftAssignment & Payment.agreedAmount
+        ShiftAssignmentResponseDto assignmentDto = workerJobService.applyForShift(wUser.getUserId(), shift.getShiftId());
+        assertEquals(0, BigDecimal.valueOf(50000).compareTo(assignmentDto.getEmergencyBonus()));
+        Payment pay = paymentRepository.findByAssignmentId(assignmentDto.getAssignmentId()).orElseThrow();
+        assertEquals(0, BigDecimal.valueOf(250000).compareTo(pay.getAgreedAmount())); // 4h * 50k + 50k bonus
+
+        // 3. Gọi quét lại ngay lập tức -> bị chặn bởi cooldown 5 phút
+        assertThrows(BadRequestException.class,
+                () -> eoEventService.redispatchEmergencyDispatch(eoUser.getUserId(), shift.getShiftId(), req));
+
+        // 4. Tắt thủ công -> reset toàn bộ cờ & cấu hình khẩn cấp
+        eoEventService.disableEmergencyDispatch(eoUser.getUserId(), shift.getShiftId());
+        Shift disabled = shiftRepository.findById(shift.getShiftId()).orElseThrow();
+        assertFalse(Boolean.TRUE.equals(disabled.getEmergency()));
+        assertNull(disabled.getEmergencyRadiusKm());
+        assertEquals(EmergencySkillRelaxation.NONE, disabled.getEmergencySkillRelaxation());
+        assertEquals(0, BigDecimal.ZERO.compareTo(disabled.getEmergencyBonus()));
     }
 
     private User saveUser(String prefix, UserRole role) {

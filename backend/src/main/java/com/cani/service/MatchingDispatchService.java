@@ -351,12 +351,14 @@ public class MatchingDispatchService {
             log.info("Bỏ qua reverse-matching cho worker {}: thiếu tọa độ GPS hợp lệ.", worker.getWorkerId());
             return 0;
         }
-        List<Shift> activeShifts = shiftRepository.findByStatus(ShiftStatus.ACTIVE);
+        Instant now = Instant.now();
+        List<Shift> activeShifts = shiftRepository.findNearbyCandidateShifts(now);
+        if (activeShifts == null || activeShifts.isEmpty()) {
+            activeShifts = shiftRepository.findByStatus(ShiftStatus.ACTIVE);
+        }
         if (activeShifts == null || activeShifts.isEmpty()) {
             return 0;
         }
-        Instant now = Instant.now();
-        Instant expiresAt = now.plus(Duration.ofHours(DEFAULT_TIMEOUT_HOURS));
         int createdCount = 0;
 
         for (Shift shift : activeShifts) {
@@ -370,7 +372,11 @@ public class MatchingDispatchService {
             if (needed <= 0) {
                 continue;
             }
-            if (!passHardFilter(worker, shift, WorkerShiftEligibilityService.MatchingChannel.REVERSE_MATCHING)) {
+            boolean isEmergencyShift = Boolean.TRUE.equals(shift.getEmergency());
+            WorkerShiftEligibilityService.MatchingChannel channel = isEmergencyShift
+                    ? WorkerShiftEligibilityService.MatchingChannel.EMERGENCY_DISPATCH
+                    : WorkerShiftEligibilityService.MatchingChannel.REVERSE_MATCHING;
+            if (!passHardFilter(worker, shift, channel)) {
                 continue;
             }
             Double targetLat = shift.getLocationLat() != null ? shift.getLocationLat()
@@ -380,18 +386,23 @@ public class MatchingDispatchService {
             if (!isValidCoordinate(targetLat, targetLng)) {
                 continue;
             }
-            double maxAllowedDistanceKm = (shift.getMaxDistanceKm() != null
-                    && shift.getMaxDistanceKm().doubleValue() > 0)
-                            ? shift.getMaxDistanceKm().doubleValue()
-                            : MAX_DISTANCE_KM;
             double distanceKm = calculateDistance(targetLat, targetLng, worker.getBaseLat(), worker.getBaseLng());
             if (!Double.isFinite(distanceKm)) {
                 continue;
             }
-            double workerMaxDist = (worker.getMaxDistanceKm() != null && worker.getMaxDistanceKm() > 0)
-                    ? worker.getMaxDistanceKm()
-                    : maxAllowedDistanceKm;
-            double effectiveAllowedDistanceKm = Math.min(maxAllowedDistanceKm, workerMaxDist);
+            double effectiveAllowedDistanceKm;
+            if (isEmergencyShift) {
+                effectiveAllowedDistanceKm = getStaffingPolicy().resolveEffectiveEmergencyRadiusKm(shift.getEmergencyRadiusKm());
+            } else {
+                double maxAllowedDistanceKm = (shift.getMaxDistanceKm() != null
+                        && shift.getMaxDistanceKm().doubleValue() > 0)
+                                ? shift.getMaxDistanceKm().doubleValue()
+                                : MAX_DISTANCE_KM;
+                double workerMaxDist = (worker.getMaxDistanceKm() != null && worker.getMaxDistanceKm() > 0)
+                        ? worker.getMaxDistanceKm()
+                        : maxAllowedDistanceKm;
+                effectiveAllowedDistanceKm = Math.min(maxAllowedDistanceKm, workerMaxDist);
+            }
             if (distanceKm > effectiveAllowedDistanceKm) {
                 continue;
             }
@@ -399,6 +410,9 @@ public class MatchingDispatchService {
                 continue;
             }
 
+            Instant expiresAt = isEmergencyShift
+                    ? now.plus(Duration.ofMinutes(30))
+                    : now.plus(Duration.ofHours(DEFAULT_TIMEOUT_HOURS));
             CandidateMatch match = calculateSoftScore(worker, distanceKm, effectiveAllowedDistanceKm, shift);
             DispatchProposal proposal = DispatchProposal.builder()
                     .shift(shift)
@@ -415,9 +429,13 @@ public class MatchingDispatchService {
             if (notificationService != null && worker.getUser() != null && worker.getUser().getUserId() != null) {
                 try {
                     String eventName = shift.getEvent() != null ? shift.getEvent().getName() : "Sự kiện CANi";
+                    String notifTitle = isEmergencyShift
+                            ? "🚨 [GẤP] Lời mời nhận ca làm khẩn cấp: " + shift.getJobType()
+                            : "Đề xuất ca làm mới: " + shift.getJobType();
+                    String notifType = isEmergencyShift ? "EMERGENCY_PROPOSAL" : "NEW_PROPOSAL";
                     notificationService.createAndSend(
                             worker.getUser().getUserId(),
-                            "Đề xuất ca làm mới: " + shift.getJobType(),
+                            notifTitle,
                             "Bạn vừa nhận được lời mời làm việc tại \"" + eventName + "\" với mức thù lao "
                                     + shift.getHourlyWage() + " đ/giờ.",
                             NotificationType.PROPOSAL,
@@ -425,7 +443,7 @@ public class MatchingDispatchService {
                             savedProposal != null && savedProposal.getProposalId() != null
                                     ? savedProposal.getProposalId()
                                     : shift.getShiftId(),
-                            Map.of("shiftId", shift.getShiftId().toString(), "type", "NEW_PROPOSAL"));
+                            Map.of("shiftId", shift.getShiftId().toString(), "type", notifType));
                 } catch (Exception ex) {
                     log.warn("Không thể gửi thông báo FCM reverse-matching: {}", ex.getMessage());
                 }
@@ -470,10 +488,31 @@ public class MatchingDispatchService {
         if (stale.isEmpty()) {
             return;
         }
+        Set<UUID> expiredEmergencyShiftIds = stale.stream()
+                .map(DispatchProposal::getShift)
+                .filter(Objects::nonNull)
+                .filter(s -> Boolean.TRUE.equals(s.getEmergency()))
+                .map(Shift::getShiftId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
         stale.forEach(p -> p.setStatus(ProposalStatus.EXPIRED));
         dispatchProposalRepository.saveAll(stale);
         log.info("Đã chuyển {} proposal PENDING hết hạn/đội trưởng đã thay đổi/nhóm ngừng hoạt động sang EXPIRED.",
                 stale.size());
+
+        // Khi proposal khẩn cấp 30 phút vừa hết hạn mà ca vẫn thiếu người & còn đủ giờ -> quét tự động 1 lượt thay thế
+        for (UUID emergencyShiftId : expiredEmergencyShiftIds) {
+            try {
+                Shift shift = shiftRepository.findById(emergencyShiftId).orElse(null);
+                if (shift != null && getStaffingPolicy().evaluateRedispatchEligibility(shift, now).canRedispatch()) {
+                    triggerEmergencyDispatchForSystem(emergencyShiftId, shift.getEmergencyRadiusKm());
+                }
+            } catch (Exception ex) {
+                log.warn("Không thể tự động quét lại ca khẩn cấp {} sau khi proposal hết hạn: {}",
+                        emergencyShiftId, ex.getMessage());
+            }
+        }
     }
 
     /**
@@ -728,16 +767,24 @@ public class MatchingDispatchService {
             return 0;
         }
 
+        Double resolvedRadiusInput = customRadiusKm != null ? customRadiusKm : shift.getEmergencyRadiusKm();
+        double emergencyRadius = policy.resolveEffectiveEmergencyRadiusKm(resolvedRadiusInput);
+
         boolean shiftDirty = false;
         if (!Boolean.TRUE.equals(shift.getEmergency())) {
             shift.setEmergency(true);
             shiftDirty = true;
         }
+        if (shift.getEmergencyRadiusKm() == null || Double.compare(shift.getEmergencyRadiusKm(), emergencyRadius) != 0) {
+            shift.setEmergencyRadiusKm(emergencyRadius);
+            shiftDirty = true;
+        }
+        shift.setEmergencyTriggeredAt(Instant.now());
+        shiftDirty = true;
         if (shift.getStatus() == ShiftStatus.IN_PROGRESS || shiftDirty) {
             shiftRepository.save(shift);
         }
 
-        double emergencyRadius = policy.resolveEffectiveEmergencyRadiusKm(customRadiusKm);
         log.info("KÍCH HOẠT EMERGENCY DISPATCH cho ca {}: Bán kính mở rộng {} km (Capped max 50km)", shiftId,
                 emergencyRadius);
 
@@ -767,16 +814,17 @@ public class MatchingDispatchService {
         matchedCandidates.sort(Comparator.comparingDouble(CandidateMatch::getFinalScore).reversed()
                 .thenComparingDouble(CandidateMatch::getDistanceKm));
 
-        // Loại ứng viên đã có Proposal PENDING/ACCEPTED hoặc Assignment trước khi lấy
-        // Top N
+        // Loại ứng viên đã có Proposal PENDING/ACCEPTED hoặc Assignment trước khi lấy Top N
         List<CandidateMatch> eligibleCandidates = matchedCandidates.stream()
                 .filter(candidate -> !hasExistingProposalOrAssignment(shiftId, candidate.getWorker().getWorkerId()))
                 .toList();
 
-        int targetDispatchCount = Math.max(needed * 3 + 5, needed);
-        List<CandidateMatch> topCandidates = eligibleCandidates.stream()
-                .limit(targetDispatchCount)
-                .toList();
+        int maxActiveEmergencyProposals = Math.max(needed * 3 + 5, needed);
+        int existingPendingProposals = policy.resolvePendingProposalCount(shift);
+        int targetDispatchCount = Math.max(0, maxActiveEmergencyProposals - existingPendingProposals);
+        List<CandidateMatch> topCandidates = targetDispatchCount > 0
+                ? eligibleCandidates.stream().limit(targetDispatchCount).toList()
+                : Collections.emptyList();
 
         int createdCount = 0;
         Instant expiresAt = Instant.now().plus(Duration.ofMinutes(30)); // Khẩn cấp: Hết hạn sau 30 phút

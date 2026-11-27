@@ -28,6 +28,8 @@ class NearbyShiftItem {
   final bool isConflicting;
   final String? conflictReason;
   final bool emergency;
+  final double emergencyBonus;
+  final String? emergencySkillRelaxation;
 
   const NearbyShiftItem({
     required this.shiftId,
@@ -59,6 +61,8 @@ class NearbyShiftItem {
     this.isConflicting = false,
     this.conflictReason,
     this.emergency = false,
+    this.emergencyBonus = 0.0,
+    this.emergencySkillRelaxation,
   });
 
   factory NearbyShiftItem.fromJson(Map<String, dynamic> json) {
@@ -92,6 +96,8 @@ class NearbyShiftItem {
       isConflicting: json['isConflicting'] as bool? ?? false,
       conflictReason: json['conflictReason'] as String?,
       emergency: json['emergency'] as bool? ?? false,
+      emergencyBonus: (json['emergencyBonus'] as num?)?.toDouble() ?? 0.0,
+      emergencySkillRelaxation: json['emergencySkillRelaxation'] as String?,
     );
   }
 }

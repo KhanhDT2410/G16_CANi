@@ -352,6 +352,12 @@ public class WorkerJobService {
             throw new BadRequestException(eligibility.reasonMessageVi());
         }
 
+        boolean wasEmergency = Boolean.TRUE.equals(shift.getEmergency());
+        BigDecimal emergencyBonusSnapshot = (wasEmergency && shift.getEmergencyBonus() != null
+                && shift.getEmergencyBonus().compareTo(BigDecimal.ZERO) > 0)
+                        ? shift.getEmergencyBonus()
+                        : BigDecimal.ZERO;
+
         // 2. ATOMIC CONCURRENCY CHECK: Tăng confirmed_workers một cách nguyên tử
         int updatedRows = shiftRepository.incrementConfirmedWorkersAtomic(shift.getShiftId());
         if (updatedRows == 0) {
@@ -373,6 +379,7 @@ public class WorkerJobService {
                 .source(AssignmentSource.MATCHING)
                 .status(AssignmentStatus.CONFIRMED)
                 .eoConfirmed(false)
+                .emergencyBonus(emergencyBonusSnapshot)
                 .build();
         attachGroupInfoIfPresent(assignment, worker,
                 proposal.getSource() == AssignmentSource.GROUP ? proposal.getGroupId() : null);
@@ -836,6 +843,12 @@ public class WorkerJobService {
             throw new BadRequestException(eligibility.reasonMessageVi());
         }
 
+        BigDecimal emergencyBonusSnapshot = (Boolean.TRUE.equals(shift.getEmergency())
+                && shift.getEmergencyBonus() != null
+                && shift.getEmergencyBonus().compareTo(BigDecimal.ZERO) > 0)
+                        ? shift.getEmergencyBonus()
+                        : BigDecimal.ZERO;
+
         int updatedRows = shiftRepository.incrementConfirmedWorkersAtomic(shiftId);
         if (updatedRows == 0) {
             throw new BadRequestException("Rất tiếc! Ca làm việc này vừa đủ số lượng nhân sự.");
@@ -848,6 +861,7 @@ public class WorkerJobService {
                 .source(AssignmentSource.DIRECT)
                 .status(AssignmentStatus.CONFIRMED)
                 .eoConfirmed(false)
+                .emergencyBonus(emergencyBonusSnapshot)
                 .build();
         // Ứng tuyển cá nhân (DIRECT) không gán group info
         assignment = shiftAssignmentRepository.save(assignment);
@@ -1708,6 +1722,12 @@ public class WorkerJobService {
                 ? eligibilityService.findScheduleConflict(s, activeAssignments)
                 : WorkerShiftEligibilityService.ScheduleConflictInfo.none();
 
+        boolean isShiftEmergency = s != null && Boolean.TRUE.equals(s.getEmergency());
+        BigDecimal emergencyBonus = (isShiftEmergency && s.getEmergencyBonus() != null
+                && s.getEmergencyBonus().compareTo(BigDecimal.ZERO) > 0)
+                        ? s.getEmergencyBonus()
+                        : BigDecimal.ZERO;
+
         return JobProposalResponseDto.builder()
                 .proposalId(p.getProposalId())
                 .shiftId(s != null ? s.getShiftId() : null)
@@ -1732,7 +1752,7 @@ public class WorkerJobService {
                 .skillRequirements(reqEntries.stream().map(WorkerShiftEligibilityService.EffectiveRequirement::toDto).toList())
                 .hourlyWage(s != null ? s.getHourlyWage() : BigDecimal.ZERO)
                 .allowance(s != null ? s.getAllowance() : BigDecimal.ZERO)
-                .totalEstimatedPay(calculateSingleWorkerShiftPay(s))
+                .totalEstimatedPay(calculateSingleWorkerShiftPay(s).add(emergencyBonus))
                 .matchScore(p.getMatchScore())
                 .scoreBreakdown(p.getScoreBreakdown())
                 .status(p.getStatus())
@@ -1742,6 +1762,8 @@ public class WorkerJobService {
                 .imageUrl(s != null ? s.getImageUrl() : null)
                 .isConflicting(conflictInfo.conflicting())
                 .conflictReason(conflictInfo.shortReasonVi())
+                .emergency(isShiftEmergency)
+                .emergencyBonus(emergencyBonus)
                 .build();
     }
 
@@ -1961,7 +1983,8 @@ public class WorkerJobService {
             }
         }
 
-        BigDecimal totalPay = calculateSingleWorkerShiftPay(s);
+        BigDecimal assignmentBonus = a.getEmergencyBonus() != null ? a.getEmergencyBonus() : BigDecimal.ZERO;
+        BigDecimal totalPay = calculateSingleWorkerShiftPay(s).add(assignmentBonus);
         BigDecimal declaredAmt = p != null && p.getDeclaredAmount() != null ? p.getDeclaredAmount() : BigDecimal.ZERO;
         BigDecimal qrAmount = (declaredAmt != null && declaredAmt.compareTo(BigDecimal.ZERO) > 0) ? declaredAmt : totalPay;
         Worker workerEntity = a.getWorker();
@@ -2005,6 +2028,7 @@ public class WorkerJobService {
                 .spRatingAwarded(Boolean.TRUE.equals(a.getSpRatingAwarded()))
                 .inviteOverrideReason(a.getInviteOverrideReason())
                 .hourlyWage(s != null ? s.getHourlyWage() : BigDecimal.ZERO)
+                .emergencyBonus(assignmentBonus)
                 .totalPay(totalPay)
                 .status(a.getStatus())
                 .source(a.getSource())

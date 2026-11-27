@@ -258,6 +258,7 @@ export function getDynamicShiftStatus(shift = {}, eventStatus = 'ACTIVE') {
 }
 
 export const DEFAULT_UNDERSTAFFED_ALERT_HOURS = 4;
+export const DEFAULT_MANUAL_EMERGENCY_WINDOW_HOURS = 24;
 export const DEFAULT_EMERGENCY_RADIUS_KM = 25;
 export const MIN_REMAINING_MINUTES_FOR_EMERGENCY = 30;
 
@@ -320,6 +321,14 @@ export function getShiftStaffingSummary(shift = {}, event = {}, now = new Date()
     startValid &&
     now.getTime() >= start.getTime() - hoursWindow * 3600 * 1000;
 
+  const withinManualWindow =
+    !isDraft &&
+    !isCancelled &&
+    !isCompleted &&
+    !isSuspended &&
+    startValid &&
+    now.getTime() >= start.getTime() - DEFAULT_MANUAL_EMERGENCY_WINDOW_HOURS * 3600 * 1000;
+
   const remainingMinutes = endValid
     ? Math.floor((end.getTime() - now.getTime()) / 60000)
     : null;
@@ -364,6 +373,16 @@ export function getShiftStaffingSummary(shift = {}, event = {}, now = new Date()
     ? Number(shift.defaultEmergencyRadiusKm)
     : DEFAULT_EMERGENCY_RADIUS_KM;
 
+  const emergencyRadiusKm = Number(shift?.emergencyRadiusKm) > 0
+    ? Number(shift.emergencyRadiusKm)
+    : defaultRadiusKm;
+  const emergencySkillRelaxation = shift?.emergencySkillRelaxation || 'NONE';
+  const emergencyBonus = Number(shift?.emergencyBonus || 0);
+  const emergencyMinRs = shift?.emergencyMinRs != null ? Number(shift.emergencyMinRs) : null;
+  const canRedispatchEmergency = Boolean(isEmergency && (shift?.canRedispatchEmergency ?? true));
+  const emergencyCooldownRemainingSeconds = Number(shift?.emergencyCooldownRemainingSeconds || 0);
+  const emergencyPreferOnlyAllowed = shift?.emergencyPreferOnlyAllowed !== false;
+
   const startTimeText = formatShiftStartTime(shift?.startTime);
   const summaryLine = `Ca ${shift?.jobType || 'Nhân sự'} bắt đầu lúc ${startTimeText} · Đã chốt ${confirmed}/${required} · Còn thiếu ${missing} người`;
 
@@ -382,11 +401,19 @@ export function getShiftStaffingSummary(shift = {}, event = {}, now = new Date()
     isEmergency,
     isFullyStaffed,
     withinAlertWindow,
+    withinManualWindow,
     nearStartUnderstaffed,
     canTriggerEmergency,
     emergencyBlockReason: shift?.emergencyBlockReason || defaultBlockReason,
     hasCandidates,
     defaultRadiusKm,
+    emergencyRadiusKm,
+    emergencySkillRelaxation,
+    emergencyBonus,
+    emergencyMinRs,
+    canRedispatchEmergency,
+    emergencyCooldownRemainingSeconds,
+    emergencyPreferOnlyAllowed,
     startTimeText,
     summaryLine,
   };

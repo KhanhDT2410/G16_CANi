@@ -330,28 +330,94 @@ public class EoEventController {
             Authentication authentication
     ) {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        EmergencyDispatchRequestDto requestDto = parseEmergencyRequest(radiusKm, body);
+        Map<String, Object> result = eoEventService.triggerEmergencyDispatchWithOptions(userId, shiftId, requestDto);
+        return ResponseEntity.ok(ApiResponse.ok(result, buildEmergencyDispatchResponseMessage(result, false)));
+    }
+
+    /**
+     * UC-59: EO cập nhật tham số (bán kính, nới lỏng kỹ năng, phụ cấp) và quét lại điều phối khẩn cấp
+     */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @PostMapping("/shifts/{shiftId}/emergency-dispatch/redispatch")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> redispatchEmergencyDispatch(
+            @PathVariable("shiftId") UUID shiftId,
+            @RequestParam(required = false) Double radiusKm,
+            @RequestBody(required = false) Map<String, Object> body,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        EmergencyDispatchRequestDto requestDto = parseEmergencyRequest(radiusKm, body);
+        Map<String, Object> result = eoEventService.redispatchEmergencyDispatch(userId, shiftId, requestDto);
+        return ResponseEntity.ok(ApiResponse.ok(result, buildEmergencyDispatchResponseMessage(result, true)));
+    }
+
+    private EmergencyDispatchRequestDto parseEmergencyRequest(Double radiusKm, Map<String, Object> body) {
         Double resolvedRadiusKm = radiusKm;
-        if (resolvedRadiusKm == null && body != null) {
-            Object raw = body.get("radiusKm") != null ? body.get("radiusKm") : body.get("expandedRadiusKm");
-            if (raw instanceof Number n) {
-                resolvedRadiusKm = n.doubleValue();
-            } else if (raw != null) {
+        com.cani.entity.enums.EmergencySkillRelaxation skillRelaxation = null;
+        Integer minReliabilityScore = null;
+        java.math.BigDecimal emergencyBonus = null;
+
+        if (body != null) {
+            if (resolvedRadiusKm == null) {
+                Object raw = body.get("radiusKm") != null ? body.get("radiusKm") : body.get("expandedRadiusKm");
+                if (raw instanceof Number n) {
+                    resolvedRadiusKm = n.doubleValue();
+                } else if (raw != null) {
+                    try {
+                        resolvedRadiusKm = Double.parseDouble(raw.toString().trim());
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+            }
+            Object rawRelax = body.get("skillRelaxation");
+            if (rawRelax != null && !rawRelax.toString().isBlank()) {
                 try {
-                    resolvedRadiusKm = Double.parseDouble(raw.toString().trim());
+                    skillRelaxation = com.cani.entity.enums.EmergencySkillRelaxation.valueOf(
+                            rawRelax.toString().trim().toUpperCase(java.util.Locale.ROOT));
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+            Object rawMinRs = body.get("minReliabilityScore");
+            if (rawMinRs instanceof Number n) {
+                minReliabilityScore = n.intValue();
+            } else if (rawMinRs != null && !rawMinRs.toString().isBlank()) {
+                try {
+                    minReliabilityScore = Integer.parseInt(rawMinRs.toString().trim());
+                } catch (NumberFormatException ignored) {
+                }
+            }
+            Object rawBonus = body.get("emergencyBonus");
+            if (rawBonus instanceof Number n) {
+                emergencyBonus = java.math.BigDecimal.valueOf(n.doubleValue());
+            } else if (rawBonus != null && !rawBonus.toString().isBlank()) {
+                try {
+                    emergencyBonus = new java.math.BigDecimal(rawBonus.toString().trim());
                 } catch (NumberFormatException ignored) {
                 }
             }
         }
-        Map<String, Object> result = eoEventService.triggerEmergencyDispatchWithDetails(userId, shiftId, resolvedRadiusKm);
+
+        return EmergencyDispatchRequestDto.builder()
+                .radiusKm(resolvedRadiusKm)
+                .skillRelaxation(skillRelaxation)
+                .minReliabilityScore(minReliabilityScore)
+                .emergencyBonus(emergencyBonus)
+                .build();
+    }
+
+    private String buildEmergencyDispatchResponseMessage(Map<String, Object> result, boolean isRedispatch) {
         int dispatched = ((Number) result.get("dispatchedCount")).intValue();
         double effectiveRadius = ((Number) result.get("effectiveRadiusKm")).doubleValue();
         String radiusLabel = (effectiveRadius == Math.rint(effectiveRadius))
                 ? String.valueOf((long) effectiveRadius)
                 : String.valueOf(effectiveRadius);
-        String msg = dispatched > 0
-                ? "Kích hoạt điều phối khẩn cấp thành công (" + radiusLabel + " km)! Đã gửi " + dispatched + " đề xuất khẩn cấp đến Worker phù hợp."
-                : "Đã bật điều phối khẩn cấp (" + radiusLabel + " km) · Chưa tìm được Worker phù hợp.";
-        return ResponseEntity.ok(ApiResponse.ok(result, msg));
+        if (dispatched > 0) {
+            return (isRedispatch ? "Đã quét lại điều phối khẩn cấp (" : "Kích hoạt điều phối khẩn cấp thành công (")
+                    + radiusLabel + " km)! Đã gửi " + dispatched + " đề xuất khẩn cấp đến Worker phù hợp.";
+        }
+        return (isRedispatch ? "Đã cập nhật & quét lại khẩn cấp (" : "Đã bật điều phối khẩn cấp (")
+                + radiusLabel + " km) · Chưa tìm được Worker phù hợp.";
     }
 
     /**

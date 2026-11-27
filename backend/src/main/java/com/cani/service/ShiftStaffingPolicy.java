@@ -3,8 +3,10 @@ package com.cani.service;
 import com.cani.entity.Event;
 import com.cani.entity.Shift;
 import com.cani.entity.enums.AssignmentStatus;
+import com.cani.entity.enums.EmergencySkillRelaxation;
 import com.cani.entity.enums.EventMode;
 import com.cani.entity.enums.EventStatus;
+import com.cani.entity.enums.JobTier;
 import com.cani.entity.enums.ProposalStatus;
 import com.cani.entity.enums.ShiftStatus;
 import com.cani.repository.DispatchProposalRepository;
@@ -31,7 +33,10 @@ public class ShiftStaffingPolicy {
 
     public static final int DEFAULT_UNDERSTAFFED_ALERT_HOURS = 4;
     public static final double DEFAULT_EMERGENCY_RADIUS_KM = 25.0;
+    public static final double SHORT_LEAD_EMERGENCY_RADIUS_KM = 15.0;
     public static final long MIN_REMAINING_MINUTES_FOR_AUTO_EMERGENCY = 30L;
+    public static final long EMERGENCY_REDISPATCH_COOLDOWN_SECONDS = 300L;
+    public static final int MIN_EMERGENCY_RELIABILITY_SCORE = 50;
     public static final List<AssignmentStatus> VALID_CONFIRMED_STATUSES = List.of(
             AssignmentStatus.CONFIRMED,
             AssignmentStatus.CHECKED_IN,
@@ -43,6 +48,9 @@ public class ShiftStaffingPolicy {
 
     @Autowired(required = false)
     private DispatchProposalRepository dispatchProposalRepository;
+
+    @Autowired(required = false)
+    private JobTierClassifier jobTierClassifier;
 
     @Getter
     @Setter
@@ -89,6 +97,13 @@ public class ShiftStaffingPolicy {
             int confirmedWorkers,
             int missingWorkers,
             double effectiveRadiusKm
+    ) {
+    }
+
+    public record RedispatchEligibility(
+            boolean canRedispatch,
+            String blockReason,
+            long cooldownRemainingSeconds
     ) {
     }
 
@@ -157,6 +172,80 @@ public class ShiftStaffingPolicy {
                 ? requestedRadiusKm
                 : fallback;
         return Math.min(Math.max(raw, 1.0), 50.0);
+    }
+
+    /**
+     * Gợi ý bán kính theo thời gian còn lại trước giờ vào ca:
+     * còn < 2 giờ hoặc đang diễn ra -> ưu tiên gần (15 km) để Worker kịp di chuyển.
+     */
+    public double resolveRecommendedEmergencyRadiusKm(Shift shift, Instant now) {
+        if (shift != null && shift.getEmergencyRadiusKm() != null && shift.getEmergencyRadiusKm() > 0) {
+            return resolveEffectiveEmergencyRadiusKm(shift.getEmergencyRadiusKm());
+        }
+        Instant effectiveNow = now != null ? now : Instant.now();
+        if (shift != null && shift.getStartTime() != null) {
+            long minutesToStart = Duration.between(effectiveNow, shift.getStartTime()).toMinutes();
+            if (minutesToStart < 120) {
+                return SHORT_LEAD_EMERGENCY_RADIUS_KM;
+            }
+        }
+        return resolveEffectiveEmergencyRadiusKm(null);
+    }
+
+    public boolean isPreferOnlyRelaxationAllowed(Shift shift) {
+        if (shift == null) {
+            return false;
+        }
+        JobTierClassifier classifier = jobTierClassifier != null ? jobTierClassifier : new JobTierClassifier();
+        JobTier tier = classifier.classify(shift.getJobType(), null);
+        return tier == JobTier.TIER_1_GENERAL
+                || tier == JobTier.TIER_2_SERVICE
+                || tier == JobTier.TIER_3_PHYSICAL;
+    }
+
+    public EmergencySkillRelaxation sanitizeSkillRelaxation(Shift shift, EmergencySkillRelaxation requested) {
+        if (requested == null || requested == EmergencySkillRelaxation.NONE) {
+            return EmergencySkillRelaxation.NONE;
+        }
+        if (requested == EmergencySkillRelaxation.PREFER_ONLY && !isPreferOnlyRelaxationAllowed(shift)) {
+            return EmergencySkillRelaxation.LOWER_TIER;
+        }
+        return requested;
+    }
+
+    public Integer sanitizeEmergencyMinRs(Shift shift, Integer requestedMinRs) {
+        if (requestedMinRs == null) {
+            return null;
+        }
+        int shiftMinRs = (shift != null && shift.getMinReliabilityScore() != null && shift.getMinReliabilityScore() > 0)
+                ? shift.getMinReliabilityScore()
+                : 60;
+        int floor = Math.min(MIN_EMERGENCY_RELIABILITY_SCORE, shiftMinRs);
+        return Math.max(floor, Math.min(shiftMinRs, requestedMinRs));
+    }
+
+    public RedispatchEligibility evaluateRedispatchEligibility(Shift shift, Instant now) {
+        Instant effectiveNow = now != null ? now : Instant.now();
+        if (shift == null || !Boolean.TRUE.equals(shift.getEmergency())) {
+            return new RedispatchEligibility(false, "Ca làm việc chưa bật chế độ điều phối khẩn cấp.", 0L);
+        }
+        AutoEmergencyEligibility base = evaluateAutoEmergencyEligibility(shift, effectiveNow);
+        if (!base.eligible()) {
+            return new RedispatchEligibility(false, base.blockReason(), 0L);
+        }
+        Instant lastTriggered = shift.getEmergencyTriggeredAt();
+        if (lastTriggered != null) {
+            long elapsed = Duration.between(lastTriggered, effectiveNow).getSeconds();
+            if (elapsed >= 0 && elapsed < EMERGENCY_REDISPATCH_COOLDOWN_SECONDS) {
+                long remaining = EMERGENCY_REDISPATCH_COOLDOWN_SECONDS - elapsed;
+                return new RedispatchEligibility(
+                        false,
+                        "Vui lòng chờ " + remaining + " giây trước khi quét lại điều phối khẩn cấp.",
+                        remaining
+                );
+            }
+        }
+        return new RedispatchEligibility(true, null, 0L);
     }
 
     public boolean isEventEligibleForStaffingOperations(Event event) {

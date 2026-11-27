@@ -39,6 +39,7 @@ public class ShiftAssignmentResponseDto {
     private Boolean spRatingAwarded;
     private String inviteOverrideReason;
     private BigDecimal hourlyWage;
+    private BigDecimal emergencyBonus;
     private BigDecimal totalPay;
     private AssignmentStatus status;
     private AssignmentSource source;

@@ -249,7 +249,11 @@ class JobRadarShiftCard extends ConsumerWidget {
                       child: Text(
                         shift.isConflicting
                             ? 'Bạn đã có ca nhận rồi'
-                            : (shift.emergency ? 'Khẩn cấp (Mở ứng tuyển)' : 'Chờ lời mời (Matching)'),
+                            : (shift.emergency
+                                ? (shift.emergencyBonus > 0
+                                    ? 'Khẩn cấp (+${(shift.emergencyBonus / 1000).round()}k)'
+                                    : 'Khẩn cấp (Mở ứng tuyển)')
+                                : 'Chờ lời mời (Matching)'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(

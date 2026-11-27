@@ -91,9 +91,9 @@ public class GeminiSkillCertificateLookupSource implements IssuerCertificateLook
 
     private static final List<String> FALLBACK_MODELS = List.of(
             "gemini-flash-lite-latest",
-            "gemini-3.8-flash",
-            "gemini-flash-latest",
-            "gemini-3.1-flash-lite-preview"
+            "gemini-2.0-flash",
+            "gemini-2.0-flash-lite",
+            "gemini-flash-latest"
     );
 
     protected String executeGeminiCall(Map<String, Object> payload) {
@@ -213,7 +213,15 @@ public class GeminiSkillCertificateLookupSource implements IssuerCertificateLook
                         rejectionReason != null ? rejectionReason : fallbackMsg);
             }
 
-            boolean isPermanent = SkillVerificationService.isPermanentExpiry(expiryDate);
+            if ("KHONG_DOC_DUOC".equalsIgnoreCase(expiryDate)) {
+                return buildMismatch(recipientName, institution, certificateNumber, issueDate, expiryDate,
+                        "UNREADABLE_EXPIRY_DATE",
+                        "Ngày hết hạn trên chứng chỉ bị mờ hoặc không đọc được. Vui lòng chụp lại rõ nét.");
+            }
+
+            boolean isPermanent = expiryDate == null
+                    || expiryDate.isBlank()
+                    || SkillVerificationService.isPermanentExpiry(expiryDate);
             String normalizedExpiry = isPermanent ? null : expiryDate;
 
             return CertificateLookupResult.builder()

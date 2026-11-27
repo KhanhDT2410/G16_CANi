@@ -43,11 +43,7 @@ final proposalsListProvider = FutureProvider<List<JobProposalItem>>((ref) async 
 
 final myDisputesListProvider = FutureProvider<List<WorkerDisputeItem>>((ref) async {
   final repo = ref.watch(proposalRepositoryProvider);
-  try {
-    return await repo.fetchMyDisputes();
-  } catch (_) {
-    return const [];
-  }
+  return repo.fetchMyDisputes();
 });
 
 /// Thống kê thu nhập và tích lũy thực chiến của Worker (UC-60 / UC-64)

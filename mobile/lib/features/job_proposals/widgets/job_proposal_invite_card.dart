@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:cani/app/cani_tokens.dart';
+import 'package:cani/shared/widgets/cani_snackbar.dart';
 import 'package:flutter/material.dart';
 
 import '../models/proposal_models.dart';
@@ -344,11 +345,11 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
                       onPressed: (isExpired || p.isConflicting)
                           ? (p.isConflicting
                               ? () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(p.conflictReason ?? 'Bạn đã có ca nhận rồi!'),
-                                      backgroundColor: cani.warning,
-                                    ),
+                                  CaniSnackBar.show(
+                                    context,
+                                    message: p.conflictReason ?? 'Bạn đã có ca trùng khung giờ này.',
+                                    tone: CaniNoticeTone.warning,
+                                    bottomOffset: 76,
                                   );
                                 }
                               : null)
@@ -720,11 +721,11 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
                     child: ElevatedButton(
                       onPressed: p.isConflicting
                           ? () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(p.conflictReason ?? 'Bạn đã có ca nhận rồi!'),
-                                  backgroundColor: cani.warning,
-                                ),
+                              CaniSnackBar.show(
+                                context,
+                                message: p.conflictReason ?? 'Bạn đã có ca trùng khung giờ này.',
+                                tone: CaniNoticeTone.warning,
+                                bottomOffset: 76,
                               );
                             }
                           : widget.onAccept,

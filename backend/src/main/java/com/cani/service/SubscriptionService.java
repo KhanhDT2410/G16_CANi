@@ -34,6 +34,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 /**
@@ -66,6 +68,7 @@ public class SubscriptionService {
 
     // Bộ nhớ đệm lưu thông tin giao dịch chờ đối soát PayOS (TxnRef -> OrderData)
     private final Map<String, PendingOrder> pendingOrders = new ConcurrentHashMap<>();
+    private static final AtomicLong ORDER_CODE_COUNTER = new AtomicLong(0);
 
     private record PendingOrder(UUID eoId, PlanType planType, BigDecimal price, Instant createdAt) {}
 
@@ -404,7 +407,7 @@ public class SubscriptionService {
                     .build();
         }
 
-        long orderCode = Math.abs(System.currentTimeMillis() % 900000000L) + 100000000L;
+        long orderCode = generateSafeOrderCode();
 
         // Lưu đơn hàng bền vững vào DB trước khi gọi PayOS Gateway (Chặn mất mát order khi restart/multi-instance)
         if (payOSOrderRepository != null) {
@@ -444,25 +447,24 @@ public class SubscriptionService {
     }
 
     /**
-     * Xác nhận thanh toán PayOS theo người dùng đăng nhập (Tránh Cross-Tenant Leak & IDOR)
+     * Xác nhận thanh toán PayOS theo người dùng đăng nhập (Tránh Cross-Tenant Leak, IDOR & Race Condition)
      */
     @Transactional
     public SubscriptionResponseDto confirmPayOSPaymentForUser(UUID userId, long orderCode) {
         EventOrganizer eo = getEoOrThrow(userId);
 
-        // 1. Phục hồi thông tin đơn hàng từ cache in-memory hoặc từ repository bền vững payos_orders
+        // 1. Khóa dòng payos_orders (Pessimistic Write) nếu tồn tại để chống race giữa user confirm & webhook
+        Optional<PayOSOrder> lockedDbOrderOpt = payOSOrderRepository != null
+                ? payOSOrderRepository.findByOrderCodeForUpdate(orderCode)
+                : Optional.empty();
         PendingOrder order = pendingOrders.get("PAYOS_" + orderCode);
-        UUID orderEoId = order != null ? order.eoId() : null;
-        PlanType orderPlanType = order != null ? order.planType() : null;
 
-        if (order == null && payOSOrderRepository != null) {
-            Optional<PayOSOrder> dbOrderOpt = payOSOrderRepository.findByOrderCode(orderCode);
-            if (dbOrderOpt.isPresent()) {
-                PayOSOrder dbOrder = dbOrderOpt.get();
-                orderEoId = dbOrder.getEoId();
-                orderPlanType = dbOrder.getPlanType();
-            }
-        }
+        UUID orderEoId = lockedDbOrderOpt.map(PayOSOrder::getEoId)
+                .orElse(order != null ? order.eoId() : null);
+        PlanType orderPlanType = lockedDbOrderOpt.map(PayOSOrder::getPlanType)
+                .orElse(order != null ? order.planType() : null);
+        BigDecimal expectedOrderAmount = lockedDbOrderOpt.map(PayOSOrder::getAmount)
+                .orElse(order != null ? order.price() : null);
 
         // 2. Chống IDOR / Cross-Tenant: kiểm tra quyền sở hữu đơn hàng
         if (orderEoId != null && !orderEoId.equals(eo.getEoId())) {
@@ -470,7 +472,24 @@ public class SubscriptionService {
             throw new BadRequestException("Giao dịch không thuộc về tài khoản Ban tổ chức hiện tại");
         }
 
-        // 3. Kiểm tra trạng thái thực tế từ PayOS Gateway
+        // 3. Idempotency: nếu đơn hàng đã được Webhook hoặc luồng khác xác nhận PAID trước đó -> trả về gói hiện tại, không kích hoạt lần 2
+        if (lockedDbOrderOpt.isPresent() && "PAID".equalsIgnoreCase(lockedDbOrderOpt.get().getStatus())) {
+            pendingOrders.remove("PAYOS_" + orderCode);
+            log.info("Idempotent confirmPayOSPaymentForUser: orderCode {} đã ở trạng thái PAID.", orderCode);
+            Instant now = Instant.now();
+            List<Subscription> activeSubs = subscriptionRepository.findActiveSubscriptions(eo.getEoId(), SubscriptionStatus.ACTIVE, now);
+            if (!activeSubs.isEmpty()) {
+                return mapToDto(activeSubs.get(0));
+            }
+            return SubscriptionResponseDto.builder()
+                    .eoId(eo.getEoId())
+                    .planType(orderPlanType)
+                    .planName("PayOS Webhook Accepted")
+                    .status(SubscriptionStatus.ACTIVE)
+                    .build();
+        }
+
+        // 4. Kiểm tra trạng thái thực tế từ PayOS Gateway
         Map<String, Object> payOsOrderDetails = payOSService.getPaymentOrderDetails(orderCode);
         String payOsStatus = payOsOrderDetails != null && payOsOrderDetails.containsKey("status")
                 ? payOsOrderDetails.get("status").toString()
@@ -481,49 +500,50 @@ public class SubscriptionService {
 
         // Phục hồi planType từ Gateway nếu bị mất bộ nhớ đệm
         if (orderPlanType == null && payOsOrderDetails != null && isRealPaid) {
-            Integer amount = (Integer) payOsOrderDetails.get("amount");
-            if (amount != null) {
+            BigDecimal gatewayAmount = parseAmount(payOsOrderDetails.get("amount"));
+            if (gatewayAmount != null) {
                 orderPlanType = planRepository.findAll().stream()
-                        .filter(p -> p.getPrice() != null && p.getPrice().intValue() == amount)
+                        .filter(p -> p.getPrice() != null && p.getPrice().compareTo(gatewayAmount) == 0)
                         .map(Plan::getPlanType)
                         .findFirst()
                         .orElse(PlanType.MATCHING_PLUS);
-                log.info("Khôi phục thành công gói dịch vụ {} cho orderCode {} từ PayOS Gateway theo số tiền {}", orderPlanType, orderCode, amount);
+                log.info("Khôi phục thành công gói dịch vụ {} cho orderCode {} từ PayOS Gateway theo số tiền {}", orderPlanType, orderCode, gatewayAmount);
             }
         }
 
-        // 4. Khi Gateway báo PAID (hoặc demoEnabled) và order hợp lệ của chính EO này -> Kích hoạt đúng gói cước trong order
+        // 5. Khi Gateway báo PAID (hoặc demoEnabled) và order hợp lệ của chính EO này -> Đối soát số tiền, khóa PAID và kích hoạt đúng 1 lần
         if (orderPlanType != null && (isRealPaid || demoEnabled)) {
-            pendingOrders.remove("PAYOS_" + orderCode);
-            BigDecimal orderAmount = order != null ? order.price() : null;
-            if (payOSOrderRepository != null) {
-                Optional<PayOSOrder> poOpt = payOSOrderRepository.findByOrderCode(orderCode);
-                if (poOpt.isPresent()) {
-                    PayOSOrder po = poOpt.get();
-                    po.setStatus("PAID");
-                    payOSOrderRepository.save(po);
-                    if (orderAmount == null) {
-                        orderAmount = po.getAmount();
-                    }
+            BigDecimal requiredAmount = resolveExpectedPlanPrice(orderPlanType, expectedOrderAmount);
+            if (isRealPaid && payOsOrderDetails != null && payOsOrderDetails.get("amount") != null) {
+                BigDecimal gatewayAmount = parseAmount(payOsOrderDetails.get("amount"));
+                if (gatewayAmount == null || gatewayAmount.compareTo(requiredAmount) < 0) {
+                    throw new BadRequestException("Số tiền thanh toán PayOS không đủ so với giá gói cước.");
                 }
             }
+
+            pendingOrders.remove("PAYOS_" + orderCode);
+            if (lockedDbOrderOpt.isPresent() && payOSOrderRepository != null) {
+                PayOSOrder po = lockedDbOrderOpt.get();
+                po.setStatus("PAID");
+                payOSOrderRepository.save(po);
+            }
             String gatewayRef = isRealPaid ? "PAYOS_VIETQR" : "PAYOS_VIETQR_DEMO";
-            return activateSubscription(eo, orderPlanType, gatewayRef, "PAYOS_" + orderCode, "POS_" + orderCode, orderAmount);
+            return activateSubscription(eo, orderPlanType, gatewayRef, "PAYOS_" + orderCode, "POS_" + orderCode, requiredAmount);
         }
 
-        // 5. Nếu có order nhưng chưa thanh toán trên Gateway -> Báo lỗi
+        // 6. Nếu có order nhưng chưa thanh toán trên Gateway -> Báo lỗi
         if (orderPlanType != null) {
             throw new BadRequestException("Giao dịch chưa hoàn tất thanh toán trên PayOS (Trạng thái: " + payOsStatus + "). Vui lòng hoàn tất chuyển khoản.");
         }
 
-        // 6. Trường hợp reload lại trang hoặc Webhook đã xử lý kích hoạt trước đó cho chính EO này
+        // 7. Trường hợp reload lại trang hoặc Webhook đã xử lý kích hoạt trước đó cho chính EO này
         Instant now = Instant.now();
         List<Subscription> activeSubs = subscriptionRepository.findActiveSubscriptions(eo.getEoId(), SubscriptionStatus.ACTIVE, now);
         if (!activeSubs.isEmpty()) {
             return mapToDto(activeSubs.get(0));
         }
 
-        // 7. Order lạ hoàn toàn không có trong hệ thống và không có gói active nào -> Từ chối
+        // 8. Order lạ hoàn toàn không có trong hệ thống và không có gói active nào -> Từ chối
         throw new BadRequestException("Giao dịch không tồn tại hoặc đã được xử lý trước đó: " + orderCode);
     }
 
@@ -532,22 +552,58 @@ public class SubscriptionService {
      */
     @Transactional
     public SubscriptionResponseDto confirmPayOSPayment(long orderCode) {
-        PendingOrder order = pendingOrders.remove("PAYOS_" + orderCode);
-        UUID eoId = order != null ? order.eoId() : null;
-        PlanType planType = order != null ? order.planType() : null;
+        return confirmPayOSPaymentInternal(orderCode, null, false);
+    }
 
-        if (order == null && payOSOrderRepository != null) {
-            Optional<PayOSOrder> dbOrderOpt = payOSOrderRepository.findByOrderCode(orderCode);
-            if (dbOrderOpt.isPresent()) {
-                PayOSOrder dbOrder = dbOrderOpt.get();
-                eoId = dbOrder.getEoId();
-                planType = dbOrder.getPlanType();
-                dbOrder.setStatus("PAID");
-                payOSOrderRepository.save(dbOrder);
+    private SubscriptionResponseDto confirmPayOSPaymentInternal(
+            long orderCode,
+            BigDecimal paidAmount,
+            boolean validatePaidAmount
+    ) {
+        // 1. Luôn khóa dòng payos_orders bằng Pessimistic Write trước (kể cả khi pendingOrders còn dữ liệu)
+        Optional<PayOSOrder> lockedDbOrderOpt = payOSOrderRepository != null
+                ? payOSOrderRepository.findByOrderCodeForUpdate(orderCode)
+                : Optional.empty();
+
+        if (lockedDbOrderOpt.isPresent()) {
+            PayOSOrder dbOrder = lockedDbOrderOpt.get();
+
+            if ("PAID".equalsIgnoreCase(dbOrder.getStatus())) {
+                pendingOrders.remove("PAYOS_" + orderCode);
+                log.info("PayOS Webhook Idempotent: Giao dịch PAYOS_{} đã ở trạng thái PAID, bỏ qua kích hoạt lại.", orderCode);
+                return SubscriptionResponseDto.builder()
+                        .eoId(dbOrder.getEoId())
+                        .planType(dbOrder.getPlanType())
+                        .planName("PayOS Webhook Accepted")
+                        .status(SubscriptionStatus.ACTIVE)
+                        .build();
             }
+
+            BigDecimal requiredAmount = resolveExpectedPlanPrice(dbOrder.getPlanType(), dbOrder.getAmount());
+            if (validatePaidAmount) {
+                validatePaymentAmount(paidAmount, requiredAmount, orderCode);
+            }
+
+            pendingOrders.remove("PAYOS_" + orderCode);
+            dbOrder.setStatus("PAID");
+            payOSOrderRepository.save(dbOrder);
+
+            EventOrganizer eo = eventOrganizerRepository.findById(dbOrder.getEoId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hồ sơ Ban tổ chức sự kiện: " + dbOrder.getEoId()));
+
+            return activateSubscription(
+                    eo,
+                    dbOrder.getPlanType(),
+                    "PAYOS_VIETQR",
+                    "PAYOS_" + orderCode,
+                    "POS_" + orderCode,
+                    requiredAmount
+            );
         }
 
-        if (eoId == null || planType == null) {
+        // 2. Fallback cho môi trường không có bản ghi payos_orders (ví dụ unit test chỉ seed pendingOrders)
+        PendingOrder cachedOrder = pendingOrders.get("PAYOS_" + orderCode);
+        if (cachedOrder == null) {
             log.info("PayOS Webhook/Internal: Giao dịch PAYOS_{} đã được xử lý trước đó hoặc không còn trong hàng đợi.", orderCode);
             return SubscriptionResponseDto.builder()
                     .planName("PayOS Webhook Accepted")
@@ -555,12 +611,31 @@ public class SubscriptionService {
                     .build();
         }
 
-        final UUID finalEoId = eoId;
-        EventOrganizer eo = eventOrganizerRepository.findById(finalEoId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hồ sơ Ban tổ chức sự kiện: " + finalEoId));
+        BigDecimal requiredAmount = resolveExpectedPlanPrice(cachedOrder.planType(), cachedOrder.price());
+        if (validatePaidAmount) {
+            validatePaymentAmount(paidAmount, requiredAmount, orderCode);
+        }
 
-        BigDecimal orderAmount = (order != null) ? order.price() : null;
-        return activateSubscription(eo, planType, "PAYOS_VIETQR", "PAYOS_" + orderCode, "POS_" + orderCode, orderAmount);
+        PendingOrder claimedOrder = pendingOrders.remove("PAYOS_" + orderCode);
+        if (claimedOrder == null) {
+            log.info("PayOS Webhook Idempotent: Giao dịch PAYOS_{} vừa được luồng khác xử lý.", orderCode);
+            return SubscriptionResponseDto.builder()
+                    .planName("PayOS Webhook Accepted")
+                    .status(SubscriptionStatus.ACTIVE)
+                    .build();
+        }
+
+        EventOrganizer eo = eventOrganizerRepository.findById(claimedOrder.eoId())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hồ sơ Ban tổ chức sự kiện: " + claimedOrder.eoId()));
+
+        return activateSubscription(
+                eo,
+                claimedOrder.planType(),
+                "PAYOS_VIETQR",
+                "PAYOS_" + orderCode,
+                "POS_" + orderCode,
+                requiredAmount
+        );
     }
 
     /**
@@ -572,11 +647,16 @@ public class SubscriptionService {
             throw new BadRequestException("Payload webhook rỗng");
         }
 
+        Object rawData = webhookPayload.get("data");
+        if (!(rawData instanceof Map<?, ?> rawDataMap)) {
+            throw new BadRequestException("Dữ liệu webhook PayOS không hợp lệ");
+        }
         @SuppressWarnings("unchecked")
-        Map<String, Object> data = (Map<String, Object>) webhookPayload.get("data");
-        String signature = (String) webhookPayload.get("signature");
+        Map<String, Object> data = (Map<String, Object>) rawDataMap;
+        Object rawSignature = webhookPayload.get("signature");
+        String signature = rawSignature instanceof String s ? s : null;
 
-        if (data == null || signature == null) {
+        if (signature == null || signature.isBlank()) {
             throw new BadRequestException("Dữ liệu webhook PayOS không hợp lệ");
         }
 
@@ -591,9 +671,118 @@ public class SubscriptionService {
             throw new BadRequestException("Thiếu orderCode trong data webhook");
         }
 
-        long orderCode = Long.parseLong(codeObj.toString());
-        log.info("Webhook PayOS xác thực thành công cho orderCode: {}", orderCode);
-        return confirmPayOSPayment(orderCode);
+        long orderCode;
+        try {
+            orderCode = Long.parseLong(codeObj.toString().trim());
+        } catch (NumberFormatException ex) {
+            throw new BadRequestException("orderCode trong webhook PayOS không hợp lệ");
+        }
+
+        if (!isWebhookPaymentPaid(webhookPayload, data)) {
+            log.info("Bỏ qua Webhook PayOS chưa thanh toán thành công cho orderCode: {}", orderCode);
+            return SubscriptionResponseDto.builder()
+                    .planName("PayOS Webhook Accepted")
+                    .status(SubscriptionStatus.EXPIRED)
+                    .build();
+        }
+
+        BigDecimal paidAmount = parseAmount(data.get("amount"));
+        log.info("Webhook PayOS xác thực thành công cho orderCode: {}, amount: {}", orderCode, paidAmount);
+        return confirmPayOSPaymentInternal(orderCode, paidAmount, true);
+    }
+
+    private long generateSafeOrderCode() {
+        if (payOSOrderRepository != null) {
+            Long seqOrderCode = payOSOrderRepository.nextOrderCode();
+            if (seqOrderCode != null && seqOrderCode > 0) {
+                return seqOrderCode;
+            }
+        }
+        long epochSeconds = System.currentTimeMillis() / 1000L;
+        long counter = Math.floorMod(ORDER_CODE_COUNTER.incrementAndGet(), 10_000L);
+        long randomSuffix = ThreadLocalRandom.current().nextInt(10, 100);
+        return epochSeconds * 1_000_000L + counter * 100L + randomSuffix;
+    }
+
+    private boolean isWebhookPaymentPaid(Map<String, Object> payload, Map<String, Object> data) {
+        if (Boolean.FALSE.equals(payload.get("success")) || Boolean.FALSE.equals(data.get("success"))) {
+            return false;
+        }
+        String dataCode = asNonBlankString(data.get("code"));
+        String topCode = asNonBlankString(payload.get("code"));
+        String effectiveCode = dataCode != null ? dataCode : topCode;
+
+        String dataStatus = asNonBlankString(data.get("status"));
+        String topStatus = asNonBlankString(payload.get("status"));
+        String effectiveStatus = dataStatus != null ? dataStatus : topStatus;
+
+        if (effectiveStatus != null && !"PAID".equalsIgnoreCase(effectiveStatus)) {
+            return false;
+        }
+        if (effectiveCode != null && !"00".equals(effectiveCode)) {
+            return false;
+        }
+        return "00".equals(effectiveCode) || "PAID".equalsIgnoreCase(effectiveStatus);
+    }
+
+    private BigDecimal resolveExpectedPlanPrice(PlanType planType, BigDecimal orderAmount) {
+        BigDecimal planPrice = null;
+        if (planRepository != null) {
+            List<Plan> dbPlans = planRepository.findAllByPlanType(planType);
+            if (dbPlans != null && !dbPlans.isEmpty()) {
+                planPrice = dbPlans.stream()
+                        .filter(p -> p.getPrice() != null && orderAmount != null && p.getPrice().compareTo(orderAmount) == 0)
+                        .findFirst()
+                        .or(() -> dbPlans.stream().findFirst())
+                        .map(Plan::getPrice)
+                        .orElse(null);
+            }
+        }
+        if (planPrice == null) {
+            planPrice = getDefaultFallbackPlans().stream()
+                    .filter(p -> p.getPlanType() == planType)
+                    .map(SubscriptionPlanDto::getPrice)
+                    .findFirst()
+                    .orElse(BigDecimal.ZERO);
+        }
+        if (orderAmount != null && orderAmount.compareTo(BigDecimal.ZERO) > 0) {
+            return orderAmount.max(planPrice);
+        }
+        return planPrice;
+    }
+
+    private void validatePaymentAmount(BigDecimal paidAmount, BigDecimal requiredAmount, long orderCode) {
+        BigDecimal minRequired = requiredAmount != null ? requiredAmount : BigDecimal.ZERO;
+        if (paidAmount == null || paidAmount.compareTo(minRequired) < 0) {
+            log.warn("Từ chối Webhook PayOS cho orderCode {} do số tiền không hợp lệ: paid={}, required={}",
+                    orderCode, paidAmount, minRequired);
+            throw new BadRequestException("Số tiền thanh toán PayOS không khớp với giá gói cước.");
+        }
+    }
+
+    private static BigDecimal parseAmount(Object rawAmount) {
+        if (rawAmount == null) {
+            return null;
+        }
+        if (rawAmount instanceof BigDecimal bd) {
+            return bd;
+        }
+        if (rawAmount instanceof Number num) {
+            return BigDecimal.valueOf(num.longValue());
+        }
+        try {
+            return new BigDecimal(rawAmount.toString().trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private static String asNonBlankString(Object raw) {
+        if (raw == null) {
+            return null;
+        }
+        String text = raw.toString().trim();
+        return text.isEmpty() ? null : text;
     }
 
     // =========================================================================

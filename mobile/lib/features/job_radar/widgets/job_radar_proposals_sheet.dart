@@ -4,10 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/app/cani_tokens.dart';
 import 'package:cani/app/home_screen.dart';
+import 'package:cani/core/utils/app_error_formatter.dart';
 import 'package:cani/features/ekyc/providers/ekyc_provider.dart';
 import 'package:cani/features/job_proposals/job_proposals.dart';
 import 'package:cani/features/job_proposals/widgets/job_proposal_invite_card.dart';
 import 'package:cani/features/job_radar/providers/job_radar_provider.dart';
+import 'package:cani/shared/widgets/cani_snackbar.dart';
 
 Future<void> acceptProposalOnRadar(
   BuildContext context,
@@ -24,27 +26,25 @@ Future<void> acceptProposalOnRadar(
     ref.invalidate(incomeSummaryProvider);
     ref.read(assignmentsSubTabProvider.notifier).state = 0;
     unawaited(radarNotifier.scanNearbyShifts(silent: true, force: true));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Nhận ca "${item.jobType}" thành công! Đã chuyển vào mục Ca làm.'),
-        backgroundColor: Theme.of(context).cani.success,
-        action: SnackBarAction(
-          label: 'Xem ca',
-          textColor: Colors.white,
-          onPressed: () {
-            ref.read(homeTabIndexProvider.notifier).state = 1;
-            ref.read(assignmentsSubTabProvider.notifier).state = 0;
-          },
-        ),
-      ),
+    CaniSnackBar.show(
+      context,
+      message: 'Đã nhận ca "${item.jobType}". Xem trong mục Ca làm.',
+      tone: CaniNoticeTone.success,
+      actionLabel: 'Xem ca',
+      bottomOffset: 76,
+      onAction: () {
+        ref.read(homeTabIndexProvider.notifier).state = 1;
+        ref.read(assignmentsSubTabProvider.notifier).state = 0;
+      },
     );
   } catch (e) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Không thể nhận ca: ${e.toString().replaceAll("Exception: ", "")}'),
-          backgroundColor: Theme.of(context).cani.danger,
-        ),
+      final reason = AppErrorFormatter.format(e, fallback: 'Vui lòng thử lại.');
+      CaniSnackBar.show(
+        context,
+        message: 'Chưa nhận được ca "${item.jobType}". $reason',
+        tone: CaniNoticeTone.error,
+        bottomOffset: 76,
       );
     }
   }
@@ -63,16 +63,20 @@ Future<void> rejectProposalOnRadar(
       ref.read(jobRadarProvider.notifier).clearSelectedShift();
     }
     ref.invalidate(proposalsListProvider);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đã bỏ qua lời mời làm việc này.')),
+    CaniSnackBar.show(
+      context,
+      message: 'Đã bỏ qua lời mời làm việc này.',
+      tone: CaniNoticeTone.info,
+      bottomOffset: 76,
     );
   } catch (e) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Lỗi khi từ chối lời mời: ${e.toString().replaceAll("Exception: ", "")}'),
-          backgroundColor: Theme.of(context).cani.danger,
-        ),
+      final reason = AppErrorFormatter.format(e, fallback: 'Vui lòng thử lại.');
+      CaniSnackBar.show(
+        context,
+        message: 'Chưa từ chối được lời mời. $reason',
+        tone: CaniNoticeTone.error,
+        bottomOffset: 76,
       );
     }
   }
@@ -90,27 +94,25 @@ Future<void> showJobRadarInviteCodeDialog(BuildContext context, WidgetRef ref) a
       ref.invalidate(incomeSummaryProvider);
       ref.read(assignmentsSubTabProvider.notifier).state = 0;
       ref.read(jobRadarProvider.notifier).scanNearbyShifts();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Tham gia ca làm việc thành công! Đã thêm vào Ca làm.'),
-          backgroundColor: Theme.of(context).cani.success,
-          action: SnackBarAction(
-            label: 'Xem ca',
-            textColor: Colors.white,
-            onPressed: () {
-              ref.read(homeTabIndexProvider.notifier).state = 1;
-              ref.read(assignmentsSubTabProvider.notifier).state = 0;
-            },
-          ),
-        ),
+      CaniSnackBar.show(
+        context,
+        message: 'Đã nhận ca qua mã mời. Xem trong mục Ca làm.',
+        tone: CaniNoticeTone.success,
+        actionLabel: 'Xem ca',
+        bottomOffset: 76,
+        onAction: () {
+          ref.read(homeTabIndexProvider.notifier).state = 1;
+          ref.read(assignmentsSubTabProvider.notifier).state = 0;
+        },
       );
     } catch (err) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi: ${err.toString().replaceAll("Exception: ", "")}'),
-            backgroundColor: Theme.of(context).cani.danger,
-          ),
+        final reason = AppErrorFormatter.format(err, fallback: 'Vui lòng thử lại.');
+        CaniSnackBar.show(
+          context,
+          message: 'Chưa tham gia được ca bằng mã mời. $reason',
+          tone: CaniNoticeTone.error,
+          bottomOffset: 76,
         );
       }
     }

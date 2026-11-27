@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:cani/app/cani_tokens.dart';
 import 'package:cani/core/utils/app_error_formatter.dart';
+import 'package:cani/shared/widgets/cani_snackbar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
@@ -250,17 +251,13 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
   }
 
   Future<void> _toggleChecklistItem(int index) async {
-    final cani = Theme.of(context).cani;
     if (!_isCheckedIn) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _isExpired
-                ? 'Ca làm việc đã quá hạn — danh sách đầu việc chỉ ở chế độ xem.'
-                : 'Vào ca (quét QR check-in) để bắt đầu tích chọn đầu việc!',
-          ),
-          backgroundColor: cani.warning,
-        ),
+      CaniSnackBar.show(
+        context,
+        message: _isExpired
+            ? 'Ca làm việc đã quá hạn — danh sách đầu việc chỉ ở chế độ xem.'
+            : 'Vào ca (quét QR check-in) để bắt đầu tích chọn đầu việc!',
+        tone: CaniNoticeTone.warning,
       );
       return;
     }
@@ -362,17 +359,13 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
   }
 
   Future<void> _captureEvidenceForTask(int index) async {
-    final cani = Theme.of(context).cani;
     if (!_isCheckedIn) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _isExpired
-                ? 'Ca làm việc đã quá hạn — không thể chụp ảnh nghiệm thu.'
-                : 'Vào ca (quét QR check-in) để chụp ảnh nghiệm thu đầu việc!',
-          ),
-          backgroundColor: cani.warning,
-        ),
+      CaniSnackBar.show(
+        context,
+        message: _isExpired
+            ? 'Ca làm việc đã quá hạn — không thể chụp ảnh nghiệm thu.'
+            : 'Vào ca (quét QR check-in) để chụp ảnh nghiệm thu đầu việc!',
+        tone: CaniNoticeTone.warning,
       );
       return;
     }
@@ -417,14 +410,6 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
 
         if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Đã nộp ảnh nghiệm thu task #${index + 1}: ${item.title}'),
-            backgroundColor: const Color(0xFF16A34A),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-
         // Tự động tìm và cuộn sang task kế tiếp chưa hoàn thành
         int nextIndex = -1;
         for (int i = index + 1; i < _checklistItems.length; i++) {
@@ -452,21 +437,18 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
             );
           }
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Tiếp tục với đầu việc #${nextIndex + 1}!'),
-                backgroundColor: const Color(0xFF0284C7),
-                duration: const Duration(seconds: 2),
-              ),
+            CaniSnackBar.show(
+              context,
+              message: 'Đã gửi ảnh minh chứng cho "${item.title}". Tiếp tục đầu việc #${nextIndex + 1}.',
+              tone: CaniNoticeTone.success,
             );
           }
         } else {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Xuất sắc! Bạn đã hoàn thành tất cả các đầu việc của ca làm.'),
-                backgroundColor: Color(0xFF16A34A),
-              ),
+            CaniSnackBar.show(
+              context,
+              message: 'Đã gửi ảnh minh chứng. Đã hoàn tất mọi đầu việc, đang chờ BTC duyệt công.',
+              tone: CaniNoticeTone.success,
             );
           }
         }
@@ -475,11 +457,10 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
       if (mounted) {
         setState(() => _uploadingTaskIndex = null);
         _uploadingIndexNotifier.value = null;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppErrorFormatter.format(e, fallback: 'Không thể tải ảnh nghiệm thu.')),
-            backgroundColor: cani.danger,
-          ),
+        CaniSnackBar.show(
+          context,
+          message: 'Chưa gửi được ảnh. Vui lòng thử lại.',
+          tone: CaniNoticeTone.error,
         );
       }
     }
@@ -530,8 +511,10 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Không thể mở ứng dụng bản đồ.')),
+        CaniSnackBar.show(
+          context,
+          message: 'Chưa mở được ứng dụng bản đồ. Vui lòng thử lại.',
+          tone: CaniNoticeTone.error,
         );
       }
     }
@@ -588,15 +571,12 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
   }
 
   Future<void> _handleBottomAction() async {
-    final cani = Theme.of(context).cani;
-
     if (_isCompleted) {
       if (_assignment.hasWorkerReviewed == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Bạn đã hoàn thành ca và gửi đánh giá Ban tổ chức rồi!'),
-            backgroundColor: Color(0xFF0D9488),
-          ),
+        CaniSnackBar.show(
+          context,
+          message: 'Bạn đã hoàn thành ca và gửi đánh giá Ban tổ chức.',
+          tone: CaniNoticeTone.info,
         );
         return;
       }
@@ -605,11 +585,10 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     }
 
     if (_isExpired) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Ca làm việc đã quá hạn điểm danh, không thể quét QR vào ca.'),
-          backgroundColor: cani.danger,
-        ),
+      CaniSnackBar.show(
+        context,
+        message: 'Ca làm việc đã quá hạn điểm danh, không thể quét QR vào ca.',
+        tone: CaniNoticeTone.error,
       );
       return;
     }
@@ -619,11 +598,10 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
         final gate = _earliestCheckinTime;
         final gateStr =
             '${gate.hour.toString().padLeft(2, '0')}:${gate.minute.toString().padLeft(2, '0')} ${gate.day.toString().padLeft(2, '0')}/${gate.month.toString().padLeft(2, '0')}';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Chưa đến giờ điểm danh ca làm (Mở lúc $gateStr). Vui lòng quay lại đúng giờ!'),
-            backgroundColor: cani.warning,
-          ),
+        CaniSnackBar.show(
+          context,
+          message: 'Chưa đến giờ điểm danh ca làm (Mở lúc $gateStr). Vui lòng quay lại đúng giờ!',
+          tone: CaniNoticeTone.warning,
         );
         return;
       }
@@ -652,32 +630,20 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
           .toList();
 
       _scrollToSection(_checklistSectionKey);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            missingPhotoTasks.isNotEmpty
-                ? 'Còn ${missingPhotoTasks.length} đầu việc yêu cầu chụp ảnh nghiệm thu tại chỗ!'
-                : 'Hãy hoàn thành ${incompleteTasks.length} đầu việc còn lại trước khi gửi BTC duyệt công!',
-          ),
-          backgroundColor: cani.warning,
-        ),
+      CaniSnackBar.show(
+        context,
+        message: missingPhotoTasks.isNotEmpty
+            ? 'Còn ${missingPhotoTasks.length} đầu việc yêu cầu chụp ảnh nghiệm thu tại chỗ!'
+            : 'Hãy hoàn thành ${incompleteTasks.length} đầu việc còn lại trước khi gửi BTC duyệt công!',
+        tone: CaniNoticeTone.warning,
       );
       return;
     }
 
-    // Bước 3: Chờ EO Duyệt công
+    // Bước 3: Chờ EO Duyệt công (trạng thái theo dõi lâu hiển thị trực tiếp trên màn hình)
     if (!_assignment.eoConfirmed) {
       await _refreshAssignment();
-      if (!mounted) return;
-      if (!_assignment.eoConfirmed) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Đã làm mới! Vui lòng chờ Ban tổ chức kiểm tra ảnh nghiệm thu và bấm Duyệt công (Bước 3).'),
-            backgroundColor: cani.brand,
-          ),
-        );
-        return;
-      }
+      return;
     }
 
     // Bước 4: Tách sang trang Thanh toán thù lao riêng
@@ -878,9 +844,11 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                                                 : 'Quá hạn điểm danh'))
                                         : (isCompleted
                                             ? 'Đã hoàn thành ca'
-                                            : (isOverdueCheckout
-                                                ? 'Quá giờ · Chờ kết ca'
-                                                : (isCheckedIn ? 'Đang trong ca làm việc' : 'Đã xác nhận nhận ca'))),
+                                            : (isCheckedIn && _isWorkReadyForEoConfirm && !_assignment.eoConfirmed
+                                                ? 'Đang chờ BTC duyệt công'
+                                                : (isOverdueCheckout
+                                                    ? 'Quá giờ · Chờ kết ca'
+                                                    : (isCheckedIn ? 'Đang trong ca làm việc' : 'Đã xác nhận nhận ca')))),
                                     style: TextStyle(
                                       fontSize: 11.5,
                                       fontWeight: FontWeight.w700,
@@ -1128,7 +1096,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                                         ? (!_isWorkReadyForEoConfirm
                                             ? 'Bước 2: Hoàn tất checklist và chụp ảnh nghiệm thu để Ban tổ chức duyệt công.'
                                             : (!_assignment.eoConfirmed
-                                                ? 'Bước 3: Đã hoàn tất đầu việc — đang chờ Ban tổ chức kiểm tra & bấm Duyệt công.'
+                                                ? 'Đang chờ BTC duyệt công — Bạn đã hoàn tất đầu việc và minh chứng.'
                                                 : (!_isPaymentConfirmed
                                                     ? 'Bước 4: Ban tổ chức đã duyệt công. Chuyển sang trang Thanh toán thù lao để đối soát 2 bên.'
                                                     : 'Bước 5: Đã xác nhận thanh toán! Quét QR Check-out để hoàn tất và chuyển sang Đánh giá.')))
@@ -1349,18 +1317,16 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
             ),
           ),
         ),
-
-          // 7. Bottom Sticky Action Bar (CANi Brand Style)
-          _buildBottomStickyBar(
-            context: context,
-            isDark: isDark,
-            cani: cani,
-            isExpired: _isExpired,
-            isCheckedIn: isCheckedIn,
-            isCompleted: isCompleted,
-            isReviewed: isReviewed,
-          ),
         ],
+      ),
+      bottomNavigationBar: _buildBottomStickyBar(
+        context: context,
+        isDark: isDark,
+        cani: cani,
+        isExpired: _isExpired,
+        isCheckedIn: isCheckedIn,
+        isCompleted: isCompleted,
+        isReviewed: isReviewed,
       ),
     );
   }

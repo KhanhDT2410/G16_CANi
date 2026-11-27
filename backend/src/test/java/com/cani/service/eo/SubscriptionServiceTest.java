@@ -98,6 +98,7 @@ class SubscriptionServiceTest {
                 .build();
 
         ReflectionTestUtils.setField(subscriptionService, "notificationService", notificationService);
+        ReflectionTestUtils.setField(subscriptionService, "payOSOrderRepository", payOSOrderRepository);
         ReflectionTestUtils.setField(subscriptionService, "strictQuotaEnforcement", false);
         ReflectionTestUtils.setField(subscriptionService, "demoEnabled", true);
     }
@@ -335,6 +336,7 @@ class SubscriptionServiceTest {
             Map<String, Object> data = new HashMap<>();
             data.put("orderCode", orderCode);
             data.put("code", "00");
+            data.put("amount", 199000);
 
             Map<String, Object> payload = new HashMap<>();
             payload.put("data", data);

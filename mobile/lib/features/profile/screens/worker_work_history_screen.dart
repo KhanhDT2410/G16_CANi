@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/app/cani_tokens.dart';
+import 'package:cani/core/utils/app_error_formatter.dart';
 import 'package:cani/features/job_proposals/data/proposal_repository.dart';
 import 'package:cani/features/job_proposals/models/proposal_models.dart';
 import 'package:cani/features/job_proposals/screens/shift_detail_execution_screen.dart';
@@ -9,6 +10,7 @@ import 'package:cani/features/job_proposals/widgets/history_kpi_bar.dart';
 import 'package:cani/features/job_proposals/widgets/history_shift_card.dart';
 import 'package:cani/features/job_proposals/widgets/payment_confirm_dialog.dart';
 import 'package:cani/features/job_proposals/widgets/rate_eo_dialog.dart';
+import 'package:cani/shared/widgets/cani_snackbar.dart';
 
 /// Trang "Lịch sử làm việc" riêng trong tab Tài khoản (Profile),
 /// giúp Worker xem nhanh toàn bộ các ca đã hoàn thành, thu nhập và đánh giá.
@@ -40,11 +42,10 @@ class _WorkerWorkHistoryScreenState extends ConsumerState<WorkerWorkHistoryScree
     );
     if (rated == true && mounted) {
       ref.invalidate(assignmentsListProvider);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Cảm ơn bạn đã gửi đánh giá cho Ban tổ chức!'),
-          backgroundColor: Theme.of(context).cani.success,
-        ),
+      CaniSnackBar.show(
+        context,
+        message: 'Đã gửi đánh giá cho Ban tổ chức.',
+        tone: CaniNoticeTone.success,
       );
     }
   }
@@ -64,20 +65,19 @@ class _WorkerWorkHistoryScreenState extends ConsumerState<WorkerWorkHistoryScree
         ref.invalidate(assignmentsListProvider);
         ref.invalidate(incomeSummaryProvider);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Đã cập nhật xác nhận thanh toán thù lao.'),
-              backgroundColor: Theme.of(context).cani.success,
-            ),
+          CaniSnackBar.show(
+            context,
+            message: 'Đã cập nhật xác nhận thanh toán thù lao.',
+            tone: CaniNoticeTone.success,
           );
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Lỗi xác nhận thanh toán: ${e.toString().replaceAll("Exception: ", "")}'),
-              backgroundColor: Theme.of(context).cani.danger,
-            ),
+          final reason = AppErrorFormatter.format(e, fallback: 'Vui lòng thử lại.');
+          CaniSnackBar.show(
+            context,
+            message: 'Chưa xác nhận được thanh toán. $reason',
+            tone: CaniNoticeTone.error,
           );
         }
       }

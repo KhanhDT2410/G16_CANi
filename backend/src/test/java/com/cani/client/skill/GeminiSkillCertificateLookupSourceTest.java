@@ -228,4 +228,39 @@ class GeminiSkillCertificateLookupSourceTest {
         assertEquals("CV_SELF_DECLARED", res.getFailureCode());
         assertEquals("PHẠM DUY HƯNG", res.getRecipientName());
     }
+
+    @Test
+    @DisplayName("Chứng chỉ khóa học hợp lệ không in ngày hết hạn (expiryDate: null) -> VERIFIED với permanentExpiry=true để không bị từ chối oan")
+    void verifyCertificate_ReturnsVerifiedPermanent_WhenCourseCertificateHasNullExpiryDate() throws Exception {
+        String innerJson = """
+                {
+                  "documentType": "CERTIFICATE",
+                  "recipientName": "Nguyễn Văn An",
+                  "institution": "Trung tâm Đào tạo Pha chế Á Âu",
+                  "certificateNumber": "AAU-2026-999",
+                  "issueDate": "12/04/2026",
+                  "expiryDate": null,
+                  "hasSealOrSignature": true,
+                  "isAuthenticCertificate": true,
+                  "matchedSkillNames": ["Pha chế (Bartender/Barista)"],
+                  "overallConfidence": 0.92,
+                  "rejectionReason": null
+                }
+                """;
+        String envelope = wrapGeminiEnvelope(innerJson);
+
+        GeminiSkillCertificateLookupSource source = new GeminiSkillCertificateLookupSource(properties, objectMapper, skillRepository) {
+            @Override
+            protected String executeGeminiCall(Map<String, Object> payload) {
+                return envelope;
+            }
+        };
+
+        CertificateLookupResult res = source.verifyCertificate(sampleRequest());
+
+        assertEquals(CertificateLookupOutcome.VERIFIED, res.getOutcome());
+        assertTrue(res.isPermanent());
+        assertNull(res.getExpiryDate());
+        assertEquals(List.of("Pha chế (Bartender/Barista)"), res.getMatchedSkillNames());
+    }
 }

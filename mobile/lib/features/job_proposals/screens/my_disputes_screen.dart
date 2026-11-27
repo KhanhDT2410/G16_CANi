@@ -2,12 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/app/cani_tokens.dart';
+import 'package:cani/core/utils/app_error_formatter.dart';
+import 'package:cani/shared/widgets/cani_snackbar.dart';
 import '../data/proposal_repository.dart';
 import '../models/dispute_models.dart';
 import '../models/proposal_models.dart';
 import '../widgets/create_dispute_sheet.dart';
-import '../widgets/shift_checklist_section.dart';
+import '../widgets/dispute_card.dart';
+import '../widgets/dispute_detail_sheet.dart';
 import 'dispute_chat_screen.dart';
+
+enum DisputeListFilter {
+  all,
+  inProgress,
+  hasResult,
+}
 
 class MyDisputesScreen extends ConsumerStatefulWidget {
   final ShiftAssignmentItem? assignment;
@@ -27,6 +36,8 @@ class _MyDisputesScreenState extends ConsumerState<MyDisputesScreen> {
     (value: 'OTHER', label: 'Khác', icon: Icons.more_horiz_rounded),
   ];
 
+  DisputeListFilter _selectedFilter = DisputeListFilter.all;
+
   Future<void> _refresh() async {
     ref.invalidate(myDisputesListProvider);
   }
@@ -36,13 +47,53 @@ class _MyDisputesScreenState extends ConsumerState<MyDisputesScreen> {
     return '${l.hour.toString().padLeft(2, '0')}:${l.minute.toString().padLeft(2, '0')}';
   }
 
-  String _formatDate(DateTime dt) {
-    final l = dt.toLocal();
-    return '${l.day.toString().padLeft(2, '0')}/${l.month.toString().padLeft(2, '0')}/${l.year}';
-  }
+  String _formatDate(DateTime dt) => DisputeCard.formatDate(dt);
 
   String _formatCurrency(num value) {
     return '${value.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ';
+  }
+
+  List<WorkerDisputeItem> _sortAndFilter(List<WorkerDisputeItem> items) {
+    final filtered = switch (_selectedFilter) {
+      DisputeListFilter.all => List<WorkerDisputeItem>.from(items),
+      DisputeListFilter.inProgress => items.where((d) => d.isInProgress).toList(),
+      DisputeListFilter.hasResult => items.where((d) => d.hasResult).toList(),
+    };
+
+    // Trong mục Tất cả, đưa hồ sơ đang xử lý lên đầu
+    filtered.sort((a, b) {
+      if (a.isInProgress != b.isInProgress) {
+        return a.isInProgress ? -1 : 1;
+      }
+      final aTime = a.createdAt;
+      final bTime = b.createdAt;
+      if (aTime != null && bTime != null) {
+        return bTime.compareTo(aTime);
+      }
+      return 0;
+    });
+    return filtered;
+  }
+
+  void _openDisputeChat(WorkerDisputeItem item) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DisputeChatScreen(
+          disputeId: item.id,
+          disputeTitle: item.title,
+          initialStatus: item.status,
+        ),
+      ),
+    );
+  }
+
+  void _openDisputeDetail(WorkerDisputeItem item) {
+    DisputeDetailSheet.show(
+      context,
+      item: item,
+      onOpenChat: () => _openDisputeChat(item),
+    );
   }
 
   Future<void> _showCreateDisputeDialog() async {
@@ -59,11 +110,10 @@ class _MyDisputesScreenState extends ConsumerState<MyDisputesScreen> {
       }
       if (!mounted) return;
       if (eligibleOptions.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Khiếu nại gắn theo ca làm việc. Vui lòng vào chi tiết một ca đã nhận để tạo khiếu nại.'),
-            backgroundColor: Theme.of(context).cani.warning,
-          ),
+        CaniSnackBar.show(
+          context,
+          message: 'Khiếu nại gắn theo ca làm việc. Vui lòng vào chi tiết một ca đã nhận để tạo khiếu nại.',
+          tone: CaniNoticeTone.warning,
         );
         return;
       }
@@ -94,11 +144,10 @@ class _MyDisputesScreenState extends ConsumerState<MyDisputesScreen> {
     if (created == true && mounted) {
       ref.invalidate(myDisputesListProvider);
       ref.invalidate(assignmentsListProvider);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đã gửi khiếu nại thành công! CSKH sẽ phản hồi trong thời gian sớm nhất.'),
-          backgroundColor: Color(0xFF16A34A),
-        ),
+      CaniSnackBar.show(
+        context,
+        message: 'Đã gửi khiếu nại thành công! CSKH sẽ phản hồi trong thời gian sớm nhất.',
+        tone: CaniNoticeTone.success,
       );
     }
   }
@@ -147,6 +196,90 @@ class _MyDisputesScreenState extends ConsumerState<MyDisputesScreen> {
     );
   }
 
+  Widget _buildFilterBar(
+    List<WorkerDisputeItem> scopedDisputes,
+    CaniTokens cani,
+    bool isDark,
+  ) {
+    final inProgressCount = scopedDisputes.where((d) => d.isInProgress).length;
+    final hasResultCount = scopedDisputes.where((d) => d.hasResult).length;
+
+    final options = <({DisputeListFilter filter, String label, int count})>[
+      (filter: DisputeListFilter.all, label: 'Tất cả', count: scopedDisputes.length),
+      (filter: DisputeListFilter.inProgress, label: 'Đang xử lý', count: inProgressCount),
+      (filter: DisputeListFilter.hasResult, label: 'Đã có kết quả', count: hasResultCount),
+    ];
+
+    return Container(
+      width: double.infinity,
+      color: cani.surface,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: Row(
+        children: options.map((opt) {
+          final isSelected = _selectedFilter == opt.filter;
+          return Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(right: opt.filter != DisputeListFilter.hasResult ? 6 : 0),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () => setState(() => _selectedFilter = opt.filter),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? cani.brand
+                        : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isSelected ? cani.brand : cani.border,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          opt.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11.8,
+                            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                            color: isSelected ? Colors.white : cani.textBody,
+                          ),
+                        ),
+                      ),
+                      if (opt.count > 0) ...[
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? Colors.white.withValues(alpha: 0.22)
+                                : cani.borderStrong,
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: Text(
+                            '${opt.count}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: isSelected ? Colors.white : cani.textMain,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cani = Theme.of(context).cani;
@@ -154,8 +287,18 @@ class _MyDisputesScreenState extends ConsumerState<MyDisputesScreen> {
     final disputesAsync = ref.watch(myDisputesListProvider);
     final shiftAssignment = widget.assignment;
 
+    final allDisputes = disputesAsync.valueOrNull ?? const <WorkerDisputeItem>[];
+    final scopedDisputes = shiftAssignment == null
+        ? allDisputes
+        : allDisputes.where((d) => d.assignmentId == shiftAssignment.assignmentId).toList();
+    final hasActiveDisputeForShift = shiftAssignment != null && scopedDisputes.any((d) => d.isOpen);
+    final isShiftCancelledBeforeWork = shiftAssignment != null &&
+        shiftAssignment.status == 'CANCELLED' &&
+        shiftAssignment.checkinTime == null;
+    final canCreateDispute = !hasActiveDisputeForShift && !isShiftCancelledBeforeWork;
+
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+      backgroundColor: cani.canvas,
       appBar: AppBar(
         title: Column(
           children: [
@@ -174,69 +317,91 @@ class _MyDisputesScreenState extends ConsumerState<MyDisputesScreen> {
         ),
         centerTitle: true,
         elevation: 0.5,
-        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-        actions: [
-          IconButton(
-            tooltip: 'Tạo khiếu nại cho ca này',
-            icon: Icon(Icons.add_circle_outline_rounded, size: 24, color: cani.brand),
-            onPressed: _showCreateDisputeDialog,
-          ),
-        ],
+        backgroundColor: cani.surface,
       ),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: disputesAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 12),
+                Text(
+                  'Đang tải danh sách hồ sơ...',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cani.textMuted),
+                ),
+              ],
+            ),
+          ),
           error: (err, _) => ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(24),
             children: [
               const SizedBox(height: 40),
               Center(
                 child: Column(
                   children: [
-                    Icon(Icons.error_outline, size: 48, color: cani.danger),
+                    Icon(Icons.error_outline_rounded, size: 48, color: cani.danger),
                     const SizedBox(height: 12),
-                    Text('Không thể tải danh sách khiếu nại: $err', textAlign: TextAlign.center),
+                    Text(
+                      'Không thể tải danh sách khiếu nại',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: cani.textMain),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      AppErrorFormatter.format(err, fallback: 'Đã xảy ra lỗi kết nối. Vui lòng thử lại.'),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: cani.textMuted),
+                    ),
                     const SizedBox(height: 16),
-                    ElevatedButton(onPressed: _refresh, child: const Text('Thử lại')),
+                    FilledButton.icon(
+                      onPressed: _refresh,
+                      icon: const Icon(Icons.refresh_rounded, size: 17),
+                      label: const Text('Thử lại'),
+                      style: FilledButton.styleFrom(backgroundColor: cani.brand),
+                    ),
                   ],
                 ),
               ),
             ],
           ),
-          data: (allDisputes) {
-            final disputes = shiftAssignment == null
-                ? allDisputes
-                : allDisputes.where((d) => d.assignmentId == shiftAssignment.assignmentId).toList();
-            final hasActiveDisputeForShift = shiftAssignment != null && disputes.any((d) => d.isOpen);
+          data: (_) {
+            final filteredDisputes = _sortAndFilter(scopedDisputes);
 
             return Column(
               children: [
                 if (shiftAssignment != null)
                   Container(
-                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                    color: cani.surface,
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                     child: Column(
                       children: [
                         _buildShiftReferenceCard(shiftAssignment, cani, isDark),
                         if (hasActiveDisputeForShift) ...[
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 8),
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFEFF6FF),
+                              color: cani.brandSoft,
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: const Color(0xFFBFDBFE)),
+                              border: Border.all(color: cani.brand.withValues(alpha: 0.3)),
                             ),
-                            child: const Row(
+                            child: Row(
                               children: [
-                                Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF0284C7)),
-                                SizedBox(width: 8),
+                                Icon(Icons.info_outline_rounded, size: 16, color: cani.brand),
+                                const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    'Ca làm này đang có hồ sơ khiếu nại chờ xử lý giữa bạn và đối tác.',
-                                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF0369A1)),
+                                    'Ca làm này đang có hồ sơ khiếu nại chờ xử lý.',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: cani.brand,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -246,321 +411,157 @@ class _MyDisputesScreenState extends ConsumerState<MyDisputesScreen> {
                       ],
                     ),
                   ),
+                _buildFilterBar(scopedDisputes, cani, isDark),
+                Divider(height: 1, color: cani.border),
                 Expanded(
-                  child: disputes.isEmpty
-                      ? ListView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.all(24),
-                          children: [
-                            const SizedBox(height: 36),
-                            Center(
-                              child: Container(
-                                width: 84,
-                                height: 84,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: cani.brand.withValues(alpha: 0.1),
-                                ),
-                                child: Icon(Icons.verified_user_rounded, size: 44, color: cani.brand),
-                              ),
+                  child: scopedDisputes.isEmpty
+                      ? _buildEmptyAllState(shiftAssignment, cani)
+                      : filteredDisputes.isEmpty
+                          ? _buildEmptyFilterState(cani)
+                          : ListView.separated(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+                              itemCount: filteredDisputes.length,
+                              separatorBuilder: (_, _) => const SizedBox(height: 12),
+                              itemBuilder: (ctx, idx) {
+                                final item = filteredDisputes[idx];
+                                return DisputeCard(
+                                  item: item,
+                                  onViewDetail: () => _openDisputeDetail(item),
+                                  onOpenChat: () => _openDisputeChat(item),
+                                );
+                              },
                             ),
-                            const SizedBox(height: 18),
-                            Text(
-                              shiftAssignment != null
-                                  ? 'Chưa có khiếu nại cho ca làm này'
-                                  : 'Chưa có tranh chấp nào',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: cani.textMain),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Nếu phát sinh vấn đề về thù lao, giờ công hoặc ứng xử trong ca làm việc, bạn có thể gửi khiếu nại kèm bằng chứng trong vòng 14 ngày để CSKH hỗ trợ phân xử.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 13.5, color: cani.textMuted, height: 1.5),
-                            ),
-                            const SizedBox(height: 24),
-                            Center(
-                              child: FilledButton.icon(
-                                icon: const Icon(Icons.gavel_rounded, size: 18),
-                                label: const Text(
-                                  'Tạo khiếu nại cho ca này',
-                                  style: TextStyle(fontWeight: FontWeight.w700),
-                                ),
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: cani.brand,
-                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                                onPressed: _showCreateDisputeDialog,
-                              ),
-                            ),
-                          ],
-                        )
-                      : ListView.separated(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
-                          itemCount: disputes.length,
-                          separatorBuilder: (_, _) => const SizedBox(height: 12),
-                          itemBuilder: (ctx, idx) => _buildDisputeCard(disputes[idx], cani, isDark),
-                        ),
                 ),
               ],
             );
           },
         ),
       ),
-      floatingActionButton: disputesAsync.maybeWhen(
-        data: (allDisputes) {
-          final filtered = shiftAssignment == null
-              ? allDisputes
-              : allDisputes.where((d) => d.assignmentId == shiftAssignment.assignmentId).toList();
-          if (filtered.isEmpty) return null;
-          final hasOpen = shiftAssignment != null && filtered.any((d) => d.isOpen);
-          if (hasOpen) return null;
-          return FloatingActionButton.extended(
-            onPressed: _showCreateDisputeDialog,
-            backgroundColor: cani.danger,
-            foregroundColor: Colors.white,
-            icon: const Icon(Icons.gavel_rounded, size: 18),
-            label: const Text('Gửi khiếu nại', style: TextStyle(fontWeight: FontWeight.w700)),
-          );
-        },
-        orElse: () => null,
+      bottomNavigationBar: _buildPrimaryCreateBar(
+        cani: cani,
+        isDark: isDark,
+        canCreateDispute: canCreateDispute,
+        hasActiveDisputeForShift: hasActiveDisputeForShift,
       ),
     );
   }
 
-  Widget _buildDisputeCard(WorkerDisputeItem item, CaniTokens cani, bool isDark) {
-    final statusColor = _getStatusColor(item.status, cani);
-    final resText = item.effectiveResolutionText;
-    final evidenceUrl = item.evidence;
-    final looksLikeImage = evidenceUrl != null &&
-        (evidenceUrl.startsWith('/api/') ||
-            evidenceUrl.startsWith('http://') ||
-            evidenceUrl.startsWith('https://') ||
-            evidenceUrl.startsWith('data:image/'));
+  Widget _buildEmptyAllState(ShiftAssignmentItem? shiftAssignment, CaniTokens cani) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(24),
+      children: [
+        const SizedBox(height: 28),
+        Center(
+          child: Container(
+            width: 76,
+            height: 76,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: cani.brand.withValues(alpha: 0.1),
+            ),
+            child: Icon(Icons.verified_user_rounded, size: 40, color: cani.brand),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          shiftAssignment != null
+              ? 'Chưa có khiếu nại cho ca làm này'
+              : 'Chưa có hồ sơ khiếu nại nào',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: cani.textMain),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Nếu phát sinh vấn đề về thù lao, giờ công hoặc ứng xử trong ca làm việc, bạn có thể gửi khiếu nại kèm bằng chứng trong vòng 14 ngày để CSKH hỗ trợ phân xử.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 13, color: cani.textMuted, height: 1.45),
+        ),
+      ],
+    );
+  }
 
+  Widget _buildEmptyFilterState(CaniTokens cani) {
+    final groupName = _selectedFilter == DisputeListFilter.inProgress
+        ? 'đang xử lý'
+        : 'đã có kết quả';
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(24),
+      children: [
+        const SizedBox(height: 36),
+        Icon(Icons.filter_list_off_rounded, size: 44, color: cani.textMuted),
+        const SizedBox(height: 12),
+        Text(
+          'Không có hồ sơ $groupName',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: cani.textMain),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Chuyển sang mục Tất cả để xem toàn bộ hồ sơ khiếu nại của bạn.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12.5, color: cani.textMuted),
+        ),
+        const SizedBox(height: 14),
+        Center(
+          child: TextButton.icon(
+            onPressed: () => setState(() => _selectedFilter = DisputeListFilter.all),
+            icon: const Icon(Icons.list_alt_rounded, size: 16),
+            label: const Text('Xem tất cả hồ sơ', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPrimaryCreateBar({
+    required CaniTokens cani,
+    required bool isDark,
+    required bool canCreateDispute,
+    required bool hasActiveDisputeForShift,
+  }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cani.border),
+        color: cani.surface,
+        border: Border(top: BorderSide(color: cani.border)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withValues(alpha: isDark ? 0.24 : 0.05),
             blurRadius: 10,
-            offset: const Offset(0, 3),
+            offset: const Offset(0, -3),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(
-                  color: cani.brandSoft,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  item.typeLabel,
-                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: cani.brand),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      item.statusLabel,
-                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: statusColor),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          if (item.eventTitle != null || item.shiftTitle != null) ...[
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.event_note_rounded, size: 14, color: cani.textMuted),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      [
-                        if (item.shiftTitle != null) item.shiftTitle!,
-                        if (item.eventTitle != null) item.eventTitle!,
-                        if (item.shiftStartTime != null) _formatDate(item.shiftStartTime!),
-                      ].join(' · '),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: cani.textMuted),
-                    ),
-                  ),
-                ],
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: FilledButton.icon(
+            onPressed: canCreateDispute ? _showCreateDisputeDialog : null,
+            icon: const Icon(Icons.gavel_rounded, size: 18),
+            label: Text(
+              hasActiveDisputeForShift
+                  ? 'Đang có khiếu nại chờ xử lý'
+                  : 'Tạo khiếu nại',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: cani.brand,
+              disabledBackgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+              disabledForegroundColor: cani.textMuted,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
-          ],
-          const SizedBox(height: 10),
-          Text(
-            item.title,
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: cani.textMain),
           ),
-          const SizedBox(height: 6),
-          Text(
-            item.description,
-            style: TextStyle(fontSize: 13, color: cani.textMuted, height: 1.45),
-          ),
-          if (evidenceUrl != null && evidenceUrl.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            if (looksLikeImage)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: buildResolvedImageWidget(
-                  evidenceUrl,
-                  height: 110,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorText: null,
-                ),
-              )
-            else
-              Row(
-                children: [
-                  Icon(Icons.attachment, size: 14, color: cani.textMuted),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      'Bằng chứng: $evidenceUrl',
-                      style: TextStyle(fontSize: 11.5, color: cani.textMuted),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-          ],
-          if (resText != null) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(11),
-              decoration: BoxDecoration(
-                color: const Color(0xFF16A34A).withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF16A34A).withValues(alpha: 0.25)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.verified_rounded, size: 16, color: Color(0xFF16A34A)),
-                      const SizedBox(width: 6),
-                      Text(
-                        item.outcomeLabel.isNotEmpty
-                            ? 'Kết quả: ${item.outcomeLabel}'
-                            : 'Kết quả phân xử',
-                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFF15803D)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    resText,
-                    style: const TextStyle(fontSize: 12.5, color: Color(0xFF166534), height: 1.4),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              if (item.createdAt != null)
-                Text(
-                  'Đã gửi: ${_formatDate(item.createdAt!)}',
-                  style: TextStyle(fontSize: 11, color: cani.textMuted),
-                ),
-              if (item.slaDeadline != null && item.isOpen)
-                Text(
-                  'Hạn xử lý SLA: ${_formatDate(item.slaDeadline!)}',
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0284C7)),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              icon: Icon(Icons.forum_outlined, size: 16, color: cani.brand),
-              label: Text(
-                'Trao đổi với Trọng tài CSKH',
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: cani.brand),
-              ),
-              style: OutlinedButton.styleFrom(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                side: BorderSide(color: cani.brand.withValues(alpha: 0.3)),
-                padding: const EdgeInsets.symmetric(vertical: 9),
-              ),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => DisputeChatScreen(
-                      disputeId: item.id,
-                      disputeTitle: item.title,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
+        ),
       ),
     );
-  }
-
-  Color _getStatusColor(String status, CaniTokens cani) {
-    switch (status) {
-      case 'OPEN':
-      case 'PENDING':
-        return const Color(0xFFD97706);
-      case 'INVESTIGATING':
-      case 'IN_REVIEW':
-        return cani.brand;
-      case 'RESOLVED':
-      case 'FINAL_RESOLVED':
-        return const Color(0xFF16A34A);
-      case 'UNVERIFIED':
-      case 'REJECTED':
-        return cani.danger;
-      case 'ESCALATED':
-        return const Color(0xFF7E22CE);
-      default:
-        return cani.textMuted;
-    }
   }
 }

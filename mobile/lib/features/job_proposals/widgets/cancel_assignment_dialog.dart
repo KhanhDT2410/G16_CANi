@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:cani/core/utils/app_error_formatter.dart';
+import 'package:cani/shared/widgets/cani_snackbar.dart';
 import '../data/proposal_repository.dart';
 import '../models/proposal_models.dart';
 
@@ -57,11 +59,11 @@ class _CancelAssignmentDialogState extends ConsumerState<CancelAssignmentDialog>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Không thể hủy ca lúc này: ${e.toString().replaceFirst('Exception: ', '')}'),
-            backgroundColor: Colors.red,
-          ),
+        final reason = AppErrorFormatter.format(e, fallback: 'Vui lòng thử lại.');
+        CaniSnackBar.show(
+          context,
+          message: 'Chưa thể hủy ca lúc này. $reason',
+          tone: CaniNoticeTone.error,
         );
       }
     } finally {

@@ -712,7 +712,9 @@ public class SkillVerificationService {
         if (extraction == null) {
             return;
         }
-        if (extraction.getModelName() != null && !extraction.getModelName().isBlank()) {
+        if (extraction.getModelName() != null
+                && !extraction.getModelName().isBlank()
+                && !"NONE".equalsIgnoreCase(extraction.getModelName().trim())) {
             entity.setModelName(extraction.getModelName());
         }
         if (extraction.getPromptVersion() != null && !extraction.getPromptVersion().isBlank()) {
@@ -776,6 +778,32 @@ public class SkillVerificationService {
                 extractionResult != null ? extractionResult.getExpiryDate() : null
         ));
         req.setHumanReviewed(false);
+
+        if ((req.getModelName() == null || req.getModelName().isBlank() || "NONE".equalsIgnoreCase(req.getModelName()))
+                && result.getVerificationSource() != null
+                && !result.getVerificationSource().isBlank()
+                && !UnsupportedCertificateLookupSource.SOURCE_CODE.equalsIgnoreCase(result.getVerificationSource())) {
+            req.setModelName(result.getVerificationSource());
+        }
+        if ((req.getExtractedSkills() == null || req.getExtractedSkills().isBlank())
+                && result.getMatchedSkillNames() != null
+                && !result.getMatchedSkillNames().isEmpty()) {
+            try {
+                List<ExtractedSkillDto> dtos = result.getMatchedSkillNames().stream()
+                        .filter(s -> s != null && !s.isBlank())
+                        .map(skillName -> ExtractedSkillDto.builder()
+                                .skillName(skillName.trim())
+                                .taxonomyRole("CERTIFICATE")
+                                .evidenceSnippet(result.getVerificationSource())
+                                .build())
+                        .toList();
+                if (!dtos.isEmpty()) {
+                    req.setExtractedSkills(objectMapper.writeValueAsString(dtos));
+                }
+            } catch (Exception ex) {
+                log.debug("Không thể tuần tự hóa matchedSkillNames từ nguồn tra cứu: {}", ex.getMessage());
+            }
+        }
 
         CertificateLookupOutcome outcome = result.getOutcome() != null
                 ? result.getOutcome()
@@ -1594,20 +1622,32 @@ public class SkillVerificationService {
     }
 
     private Optional<String> resolveVerifiedEkycFullName(Worker worker) {
-        if (worker == null || workerEkycVerificationRepository == null) {
+        if (worker == null) {
             return Optional.empty();
         }
-        try {
-            return workerEkycVerificationRepository
-                    .findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(
-                            worker.getWorkerId(), List.of("VERIFIED", "APPROVED"))
-                    .map(WorkerEkycVerification::getFullName)
-                    .map(String::trim)
-                    .filter(name -> !name.isBlank());
-        } catch (Exception ex) {
-            log.warn("Không thể lấy danh tính eKYC đã xác thực của Worker {}: {}", worker.getWorkerId(), ex.getMessage());
-            return Optional.empty();
+        if (workerEkycVerificationRepository != null) {
+            try {
+                Optional<String> fromHistory = workerEkycVerificationRepository
+                        .findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(
+                                worker.getWorkerId(), List.of("VERIFIED", "APPROVED"))
+                        .map(WorkerEkycVerification::getFullName)
+                        .map(String::trim)
+                        .filter(name -> !name.isBlank());
+                if (fromHistory.isPresent()) {
+                    return fromHistory;
+                }
+            } catch (Exception ex) {
+                log.warn("Không thể lấy danh tính eKYC đã xác thực của Worker {}: {}", worker.getWorkerId(), ex.getMessage());
+            }
         }
+        if (worker.getKycStatus() == com.cani.entity.enums.KycStatus.APPROVED) {
+            String workerFullName = firstNonBlankText(
+                    worker.getFullName(),
+                    worker.getUser() != null ? worker.getUser().getFullName() : null
+            );
+            return Optional.ofNullable(workerFullName);
+        }
+        return Optional.empty();
     }
 
     private WorkerSkillResponseDto mapToWorkerSkillDto(WorkerSkill ws) {

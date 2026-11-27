@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/app/cani_tokens.dart';
 import 'package:cani/app/home_screen.dart';
+import 'package:cani/core/utils/app_error_formatter.dart';
 import 'package:cani/features/job_proposals/data/proposal_repository.dart';
 import 'package:cani/features/job_proposals/models/proposal_models.dart';
 import 'package:cani/features/job_proposals/widgets/job_proposal_invite_card.dart';
@@ -14,6 +15,7 @@ import 'package:cani/features/job_radar/widgets/job_detail_bottom_sheet.dart';
 import 'package:cani/features/job_radar/widgets/job_radar_filter_bar.dart';
 import 'package:cani/features/job_radar/widgets/job_radar_proposals_sheet.dart';
 import 'package:cani/features/job_radar/widgets/radar_sliding_job_card.dart';
+import 'package:cani/shared/widgets/cani_snackbar.dart';
 
 void showJobRadarShiftDetails(
   BuildContext context,
@@ -33,8 +35,11 @@ void showJobRadarShiftDetails(
         Navigator.pop(ctx);
         ref.read(jobRadarProvider.notifier).dismissShiftFromRadar(shift.shiftId);
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Đã bỏ qua ca làm việc này.')),
+          CaniSnackBar.show(
+            context,
+            message: 'Đã bỏ qua ca làm việc này.',
+            tone: CaniNoticeTone.info,
+            bottomOffset: 76,
           );
         }
       },
@@ -76,13 +81,11 @@ Future<void> applyQuickForRadarShift(
 ) async {
   if (!shift.emergency) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-            'Ca này chưa ở chế độ khẩn cấp — hãy chờ lời mời việc (Matching) từ Ban tổ chức!',
-          ),
-          backgroundColor: Theme.of(context).cani.warning,
-        ),
+      CaniSnackBar.show(
+        context,
+        message: 'Ca này chưa ở chế độ khẩn cấp. Vui lòng chờ lời mời từ Ban tổ chức.',
+        tone: CaniNoticeTone.warning,
+        bottomOffset: 76,
       );
     }
     return;
@@ -97,34 +100,31 @@ Future<void> applyQuickForRadarShift(
     ref.invalidate(incomeSummaryProvider);
     ref.read(assignmentsSubTabProvider.notifier).state = 0;
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Ứng tuyển thành công ca: ${shift.jobType} tại ${shift.eventName}!'),
-          backgroundColor: Theme.of(context).cani.success,
-          action: SnackBarAction(
-            label: 'Xem ca',
-            textColor: Colors.white,
-            onPressed: () {
-              ref.read(homeTabIndexProvider.notifier).state = 1;
-              ref.read(assignmentsSubTabProvider.notifier).state = 0;
-            },
-          ),
-        ),
+      CaniSnackBar.show(
+        context,
+        message: 'Đã nhận ca "${shift.jobType}". Xem trong mục Ca làm.',
+        tone: CaniNoticeTone.success,
+        actionLabel: 'Xem ca',
+        bottomOffset: 76,
+        onAction: () {
+          ref.read(homeTabIndexProvider.notifier).state = 1;
+          ref.read(assignmentsSubTabProvider.notifier).state = 0;
+        },
       );
     }
   } catch (e) {
-    final msg = e.toString().replaceAll("Exception: ", "");
+    final msg = AppErrorFormatter.format(e, fallback: 'Vui lòng thử lại.');
     if (msg.contains('đã nhận hoặc ứng tuyển')) {
       final radarNotifier = ref.read(jobRadarProvider.notifier);
       radarNotifier.removeShiftFromRadar(shift.shiftId);
       unawaited(radarNotifier.scanNearbyShifts(silent: true, force: true));
     }
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Không thể ứng tuyển: $msg'),
-          backgroundColor: Theme.of(context).cani.danger,
-        ),
+      CaniSnackBar.show(
+        context,
+        message: 'Chưa nhận được ca "${shift.jobType}". $msg',
+        tone: CaniNoticeTone.error,
+        bottomOffset: 76,
       );
     }
   }

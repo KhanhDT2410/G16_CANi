@@ -1,7 +1,11 @@
 package com.cani.service.eo;
 
+import com.cani.config.PayOSConfig;
+import com.cani.dto.subscription.PayOSPaymentResponseDto;
+import com.cani.dto.subscription.PurchaseSubscriptionRequestDto;
 import com.cani.dto.subscription.SubscriptionResponseDto;
 import com.cani.entity.EventOrganizer;
+import com.cani.entity.PayOSOrder;
 import com.cani.entity.Subscription;
 import com.cani.entity.User;
 import com.cani.entity.enums.PlanType;
@@ -59,6 +63,9 @@ class SubscriptionBillingSecurityTest {
     private PayOSService payOSService;
 
     @Mock
+    private PayOSConfig payOSConfig;
+
+    @Mock
     private PayOSOrderRepository payOSOrderRepository;
 
     @Mock
@@ -91,6 +98,7 @@ class SubscriptionBillingSecurityTest {
                 .build();
 
         ReflectionTestUtils.setField(subscriptionService, "notificationService", notificationService);
+        ReflectionTestUtils.setField(subscriptionService, "payOSOrderRepository", payOSOrderRepository);
         ReflectionTestUtils.setField(subscriptionService, "strictQuotaEnforcement", false);
         ReflectionTestUtils.setField(subscriptionService, "demoEnabled", false);
     }
@@ -235,5 +243,159 @@ class SubscriptionBillingSecurityTest {
         assertThat(res).isNotNull();
         assertThat(res.getPlanType()).isEqualTo(PlanType.FREE_TRIAL);
         verify(subscriptionRepository, never()).save(any(Subscription.class));
+    }
+
+    @Test
+    @DisplayName("PAY-001.1: Webhook PayOS có chữ ký hợp lệ nhưng status=CANCELLED hoặc code!=00 -> KHÔNG kích hoạt gói")
+    void processPayOSWebhook_CancelledOrNon00Code_DoesNotActivateSubscription() {
+        long orderCode = 202600001L;
+        PayOSOrder dbOrder = PayOSOrder.builder()
+                .orderId(UUID.randomUUID())
+                .orderCode(orderCode)
+                .eoId(sampleEoId)
+                .planType(PlanType.ENTERPRISE)
+                .amount(BigDecimal.valueOf(249000))
+                .status("PENDING")
+                .build();
+        lenient().when(payOSOrderRepository.findByOrderCodeForUpdate(orderCode)).thenReturn(Optional.of(dbOrder));
+
+        Map<String, Object> cancelledData = new HashMap<>();
+        cancelledData.put("orderCode", orderCode);
+        cancelledData.put("code", "00");
+        cancelledData.put("status", "CANCELLED");
+        cancelledData.put("amount", 249000);
+        Map<String, Object> cancelledPayload = Map.of("data", cancelledData, "signature", "sig-ok");
+
+        when(payOSConfig.verifyWebhookSignature(eq(cancelledData), eq("sig-ok"))).thenReturn(true);
+
+        SubscriptionResponseDto res1 = subscriptionService.processPayOSWebhook(cancelledPayload);
+        assertThat(res1.getStatus()).isNotEqualTo(SubscriptionStatus.ACTIVE);
+        assertThat(dbOrder.getStatus()).isEqualTo("PENDING");
+
+        Map<String, Object> failedData = new HashMap<>();
+        failedData.put("orderCode", orderCode);
+        failedData.put("code", "01");
+        failedData.put("amount", 249000);
+        Map<String, Object> failedPayload = Map.of("data", failedData, "signature", "sig-fail");
+
+        when(payOSConfig.verifyWebhookSignature(eq(failedData), eq("sig-fail"))).thenReturn(true);
+
+        SubscriptionResponseDto res2 = subscriptionService.processPayOSWebhook(failedPayload);
+        assertThat(res2.getStatus()).isNotEqualTo(SubscriptionStatus.ACTIVE);
+        assertThat(dbOrder.getStatus()).isEqualTo("PENDING");
+        verify(subscriptionRepository, never()).save(any(Subscription.class));
+    }
+
+    @Test
+    @DisplayName("PAY-001.2: Webhook PayOS gửi amount < plan.price (hoặc thiếu amount) -> Từ chối BadRequestException và giữ nguyên PENDING")
+    void processPayOSWebhook_UnderpaidAmount_RejectsAndActivatesNothing() {
+        long orderCode = 202600002L;
+        PayOSOrder dbOrder = PayOSOrder.builder()
+                .orderId(UUID.randomUUID())
+                .orderCode(orderCode)
+                .eoId(sampleEoId)
+                .planType(PlanType.ENTERPRISE)
+                .amount(BigDecimal.valueOf(249000))
+                .status("PENDING")
+                .build();
+        when(payOSOrderRepository.findByOrderCodeForUpdate(orderCode)).thenReturn(Optional.of(dbOrder));
+
+        Map<String, Object> underpaidData = new HashMap<>();
+        underpaidData.put("orderCode", orderCode);
+        underpaidData.put("code", "00");
+        underpaidData.put("status", "PAID");
+        underpaidData.put("amount", 1000); // Giả mạo trả 1.000đ cho gói 249.000đ
+        Map<String, Object> payload = Map.of("data", underpaidData, "signature", "sig-underpaid");
+
+        when(payOSConfig.verifyWebhookSignature(eq(underpaidData), eq("sig-underpaid"))).thenReturn(true);
+
+        assertThatThrownBy(() -> subscriptionService.processPayOSWebhook(payload))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Số tiền thanh toán PayOS không khớp");
+
+        assertThat(dbOrder.getStatus()).isEqualTo("PENDING");
+        verify(payOSOrderRepository, never()).save(any());
+        verify(subscriptionRepository, never()).save(any(Subscription.class));
+    }
+
+    @Test
+    @DisplayName("PAY-001.3: Webhook PayOS lần 1 khóa FOR UPDATE cập nhật DB sang PAID dù pendingOrders còn cache; retry lần 2, 3 là idempotent (kích hoạt đúng 1 lần)")
+    void processPayOSWebhook_UpdatesDbPaidOnFirstCallAndIsIdempotentOnRetries() {
+        long orderCode = 202600003L;
+        seedPendingOrder(orderCode, sampleEoId, PlanType.ENTERPRISE);
+
+        PayOSOrder dbOrder = PayOSOrder.builder()
+                .orderId(UUID.randomUUID())
+                .orderCode(orderCode)
+                .eoId(sampleEoId)
+                .planType(PlanType.ENTERPRISE)
+                .amount(BigDecimal.valueOf(249000))
+                .status("PENDING")
+                .build();
+
+        when(payOSOrderRepository.findByOrderCodeForUpdate(orderCode)).thenReturn(Optional.of(dbOrder));
+        when(payOSOrderRepository.save(any(PayOSOrder.class))).thenAnswer(i -> i.getArgument(0));
+        when(eventOrganizerRepository.findById(sampleEoId)).thenReturn(Optional.of(sampleEo));
+        when(subscriptionRepository.save(any(Subscription.class))).thenAnswer(i -> {
+            Subscription s = i.getArgument(0);
+            s.setSubscriptionId(UUID.randomUUID());
+            return s;
+        });
+        when(eventOrganizerRepository.save(any(EventOrganizer.class))).thenAnswer(i -> i.getArgument(0));
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("orderCode", orderCode);
+        data.put("code", "00");
+        data.put("status", "PAID");
+        data.put("amount", 249000);
+        Map<String, Object> payload = Map.of("data", data, "signature", "sig-valid");
+        when(payOSConfig.verifyWebhookSignature(eq(data), eq("sig-valid"))).thenReturn(true);
+
+        // Lần 1: Kích hoạt gói, đồng thời chuyển PayOSOrder.status sang PAID
+        SubscriptionResponseDto first = subscriptionService.processPayOSWebhook(payload);
+        assertThat(first.getStatus()).isEqualTo(SubscriptionStatus.ACTIVE);
+        assertThat(first.getPlanType()).isEqualTo(PlanType.ENTERPRISE);
+        assertThat(dbOrder.getStatus()).isEqualTo("PAID");
+
+        // Retry lần 2 & 3 từ PayOS: findByOrderCodeForUpdate thấy status == PAID -> trả idempotent, KHÔNG gọi lại activateSubscription
+        SubscriptionResponseDto retry2 = subscriptionService.processPayOSWebhook(payload);
+        SubscriptionResponseDto retry3 = subscriptionService.processPayOSWebhook(payload);
+        assertThat(retry2.getPlanName()).isEqualTo("PayOS Webhook Accepted");
+        assertThat(retry3.getPlanName()).isEqualTo("PayOS Webhook Accepted");
+
+        verify(payOSOrderRepository, times(3)).findByOrderCodeForUpdate(orderCode);
+        verify(subscriptionRepository, times(1)).save(any(Subscription.class));
+        verify(notificationService, times(1)).createAndSend(eq(sampleUserId), anyString(), anyString(), any(), anyString(), any(), anyMap());
+    }
+
+    @Test
+    @DisplayName("PAY-001.4: createPayOSPaymentSession sinh orderCode không trùng lặp khi gọi liên tiếp (cả qua Sequence và Atomic fallback)")
+    void createPayOSPaymentSession_GeneratesUniqueOrderCodesConcurrently() {
+        when(eventOrganizerRepository.findByUser_UserId(sampleUserId)).thenReturn(Optional.of(sampleEo));
+        when(payOSService.createPaymentRequest(anyLong(), anyInt(), anyString(), any(), any()))
+                .thenAnswer(inv -> PayOSPaymentResponseDto.builder()
+                        .orderCode(inv.getArgument(0))
+                        .amount(inv.getArgument(1))
+                        .status("PENDING")
+                        .build());
+
+        PurchaseSubscriptionRequestDto request = new PurchaseSubscriptionRequestDto();
+        request.setPlanType(PlanType.MATCHING_PLUS);
+
+        // 1. Khi Sequence trả null (ví dụ chưa có sequence), fallback Atomic counter + random suffix vẫn không bao giờ trùng
+        Set<Long> fallbackCodes = new HashSet<>();
+        for (int i = 0; i < 50; i++) {
+            PayOSPaymentResponseDto resp = subscriptionService.createPayOSPaymentSession(sampleUserId, request);
+            assertThat(resp.getOrderCode()).isPositive();
+            fallbackCodes.add(resp.getOrderCode());
+        }
+        assertThat(fallbackCodes).hasSize(50);
+
+        // 2. Khi PostgreSQL Sequence hoạt động, sử dụng trực tiếp giá trị từ Sequence
+        when(payOSOrderRepository.nextOrderCode()).thenReturn(1000000001L, 1000000002L);
+        PayOSPaymentResponseDto seqResp1 = subscriptionService.createPayOSPaymentSession(sampleUserId, request);
+        PayOSPaymentResponseDto seqResp2 = subscriptionService.createPayOSPaymentSession(sampleUserId, request);
+        assertThat(seqResp1.getOrderCode()).isEqualTo(1000000001L);
+        assertThat(seqResp2.getOrderCode()).isEqualTo(1000000002L);
     }
 }

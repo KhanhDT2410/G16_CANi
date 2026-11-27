@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/app/cani_tokens.dart';
 import 'package:cani/core/utils/app_error_formatter.dart';
+import 'package:cani/shared/widgets/cani_snackbar.dart';
 import '../data/proposal_repository.dart';
 import '../models/proposal_models.dart';
 import '../widgets/cancel_assignment_dialog.dart';
@@ -54,11 +55,10 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
       if (DateTime.now().isBefore(gate)) {
         final gateStr =
             '${gate.hour.toString().padLeft(2, '0')}:${gate.minute.toString().padLeft(2, '0')} ${gate.day.toString().padLeft(2, '0')}/${gate.month.toString().padLeft(2, '0')}';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Chưa đến giờ điểm danh ca làm (Mở lúc $gateStr). Vui lòng quay lại đúng giờ!'),
-            backgroundColor: Theme.of(context).cani.warning,
-          ),
+        CaniSnackBar.show(
+          context,
+          message: 'Chưa đến giờ điểm danh ca làm (Mở lúc $gateStr). Vui lòng quay lại đúng giờ!',
+          tone: CaniNoticeTone.warning,
         );
         return;
       }
@@ -76,7 +76,6 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
   }
 
   Future<void> _openInviteCodeDialog() async {
-    final t = Theme.of(context).cani;
     final result = await InviteCodeDialog.show(
       context,
       title: 'Nhập Mã Mời Tham Gia Ca',
@@ -87,11 +86,10 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
       try {
         await ref.read(proposalRepositoryProvider).joinViaInviteCode(result);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Tham gia ca làm việc thành công!'),
-              backgroundColor: t.success,
-            ),
+          CaniSnackBar.show(
+            context,
+            message: 'Tham gia ca làm việc thành công!',
+            tone: CaniNoticeTone.success,
           );
           ref.invalidate(assignmentsListProvider);
           ref.invalidate(incomeSummaryProvider);
@@ -99,11 +97,11 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
         }
       } catch (err) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(AppErrorFormatter.format(err, fallback: 'Không thể tham gia ca làm.')),
-              backgroundColor: t.danger,
-            ),
+          final reason = AppErrorFormatter.format(err, fallback: 'Vui lòng thử lại.');
+          CaniSnackBar.show(
+            context,
+            message: 'Chưa thể tham gia ca làm. $reason',
+            tone: CaniNoticeTone.error,
           );
         }
       }
@@ -111,7 +109,6 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
   }
 
   Future<void> _openInviteQrScanner() async {
-    final t = Theme.of(context).cani;
     final joined = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
@@ -125,11 +122,10 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
       ),
     );
     if (joined == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Tham gia ca làm việc thành công!'),
-          backgroundColor: t.success,
-        ),
+      CaniSnackBar.show(
+        context,
+        message: 'Tham gia ca làm việc thành công!',
+        tone: CaniNoticeTone.success,
       );
       ref.invalidate(assignmentsListProvider);
       ref.invalidate(incomeSummaryProvider);
@@ -152,11 +148,10 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
     final isCheckedIn = active.status == 'CHECKED_IN';
     if (isCheckedIn) {
       if (!active.eoConfirmed) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Cần hoàn tất đầu việc & chờ BTC Duyệt công (Bước 3) trước khi Check-out.'),
-            backgroundColor: Theme.of(context).cani.warning,
-          ),
+        CaniSnackBar.show(
+          context,
+          message: 'Cần hoàn tất đầu việc & chờ BTC Duyệt công (Bước 3) trước khi Check-out.',
+          tone: CaniNoticeTone.warning,
         );
         _openExecutionScreen(active);
         return;
@@ -187,11 +182,10 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
     );
     if (cancelled == true && mounted) {
       ref.invalidate(assignmentsListProvider);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Đã hủy nhận ca làm việc. Hệ thống đang tìm người thay thế.'),
-          backgroundColor: Theme.of(context).cani.danger,
-        ),
+      CaniSnackBar.show(
+        context,
+        message: 'Đã hủy nhận ca làm việc. Hệ thống đang tìm người thay thế.',
+        tone: CaniNoticeTone.info,
       );
     }
   }

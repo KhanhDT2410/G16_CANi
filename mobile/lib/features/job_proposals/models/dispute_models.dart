@@ -17,6 +17,7 @@ class WorkerDisputeItem {
   final String? resolution;
   final String? decisionRationale;
   final String? finalDecisionRationale;
+  final String? escalationReason;
   final DateTime? slaDeadline;
   final DateTime? createdAt;
   final DateTime? resolvedAt;
@@ -40,6 +41,7 @@ class WorkerDisputeItem {
     this.resolution,
     this.decisionRationale,
     this.finalDecisionRationale,
+    this.escalationReason,
     this.slaDeadline,
     this.createdAt,
     this.resolvedAt,
@@ -76,13 +78,57 @@ class WorkerDisputeItem {
       resolution: json['resolution'] as String?,
       decisionRationale: json['decisionRationale'] as String?,
       finalDecisionRationale: json['finalDecisionRationale'] as String?,
+      escalationReason: json['escalationReason'] as String?,
       slaDeadline: json['slaDeadline'] != null ? DateTime.tryParse(json['slaDeadline'].toString())?.toLocal() : null,
       createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt'].toString())?.toLocal() : null,
       resolvedAt: json['resolvedAt'] != null ? DateTime.tryParse(json['resolvedAt'].toString())?.toLocal() : null,
     );
   }
 
-  bool get isOpen => status == 'OPEN' || status == 'INVESTIGATING' || status == 'ESCALATED' || status == 'PENDING' || status == 'IN_REVIEW';
+  /// Phân loại trạng thái nghiệp vụ: Đang xử lý (bao gồm cả hồ sơ đang kháng nghị) vs Đã có kết quả.
+  static bool isStatusInProgress(String rawStatus) {
+    switch (rawStatus.trim().toUpperCase()) {
+      case 'OPEN':
+      case 'PENDING':
+      case 'INVESTIGATING':
+      case 'IN_REVIEW':
+      case 'ESCALATED':
+      case 'APPEAL_REQUESTED':
+      case 'APPEALING':
+      case 'UNDER_APPEAL':
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  bool get isInProgress => isStatusInProgress(status);
+
+  bool get isOpen => isInProgress;
+
+  bool get hasResult => !isInProgress;
+
+  bool get isAppealing {
+    final normalized = status.trim().toUpperCase();
+    return normalized == 'ESCALATED' ||
+        normalized == 'APPEAL_REQUESTED' ||
+        normalized == 'APPEALING' ||
+        normalized == 'UNDER_APPEAL';
+  }
+
+  List<DisputeEvidenceItem> get allEvidences {
+    if (evidences.isNotEmpty) return evidences;
+    if (evidence != null && evidence!.trim().isNotEmpty) {
+      return [
+        DisputeEvidenceItem(
+          id: 'legacy-evidence',
+          fileType: 'IMAGE',
+          fileUrl: evidence!.trim(),
+        ),
+      ];
+    }
+    return const [];
+  }
 
   String? get effectiveResolutionText {
     if (finalDecisionRationale != null && finalDecisionRationale!.trim().isNotEmpty) {
@@ -115,7 +161,7 @@ class WorkerDisputeItem {
   }
 
   String get statusLabel {
-    switch (status) {
+    switch (status.trim().toUpperCase()) {
       case 'OPEN':
       case 'PENDING':
         return 'Chờ tiếp nhận';
@@ -129,9 +175,14 @@ class WorkerDisputeItem {
       case 'REJECTED':
         return 'Đã từ chối';
       case 'ESCALATED':
+      case 'APPEAL_REQUESTED':
+      case 'APPEALING':
+      case 'UNDER_APPEAL':
         return 'Đang kháng nghị Admin';
       case 'FINAL_RESOLVED':
         return 'Quyết định cuối cùng';
+      case 'CLOSED':
+        return 'Đã đóng';
       default:
         return status;
     }

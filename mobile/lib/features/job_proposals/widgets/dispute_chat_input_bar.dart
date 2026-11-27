@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cani/app/cani_tokens.dart';
+import 'package:cani/shared/widgets/cani_snackbar.dart';
 import '../../ekyc/screens/card_scanner_screen.dart';
 import '../data/proposal_repository.dart';
 
@@ -56,8 +57,10 @@ class _DisputeChatInputBarState extends ConsumerState<DisputeChatInputBar> {
     } catch (e) {
       if (mounted) {
         setState(() => _isUploadingPhoto = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không thể tải ảnh minh chứng: $e')),
+        CaniSnackBar.show(
+          context,
+          message: 'Chưa gửi được ảnh. Vui lòng thử lại.',
+          tone: CaniNoticeTone.error,
         );
       }
     }
@@ -89,9 +92,12 @@ class _DisputeChatInputBarState extends ConsumerState<DisputeChatInputBar> {
           children: [
             Icon(Icons.lock_outline_rounded, size: 16, color: cani.textMuted),
             const SizedBox(width: 8),
-            Text(
-              'Vụ việc đã đóng, kênh trao đổi đã được khép lại.',
-              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: cani.textMuted),
+            Flexible(
+              child: Text(
+                'Vụ việc đã đóng, kênh trao đổi đã được khép lại.',
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: cani.textMuted),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),

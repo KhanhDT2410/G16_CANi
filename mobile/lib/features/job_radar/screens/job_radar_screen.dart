@@ -11,6 +11,7 @@ import 'package:cani/features/job_radar/widgets/job_radar_filter_bar.dart';
 import 'package:cani/features/job_radar/widgets/job_radar_map_painter.dart';
 import 'package:cani/features/job_radar/widgets/job_radar_proposals_sheet.dart';
 import 'package:cani/features/job_radar/widgets/job_radar_shift_card.dart';
+import 'package:cani/shared/widgets/cani_snackbar.dart';
 
 class JobRadarScreen extends ConsumerStatefulWidget {
   const JobRadarScreen({super.key});
@@ -38,12 +39,11 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
       jobRadarProvider.select((s) => s.errorMessage),
       (previous, next) {
         if (next != null && next.isNotEmpty && next != previous && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(next),
-              backgroundColor: Theme.of(context).cani.danger,
-              behavior: SnackBarBehavior.floating,
-            ),
+          CaniSnackBar.show(
+            context,
+            message: next,
+            tone: CaniNoticeTone.error,
+            bottomOffset: 76,
           );
         }
       },

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cani/app/cani_tokens.dart';
 import 'package:cani/core/utils/app_error_formatter.dart';
+import 'package:cani/shared/widgets/cani_snackbar.dart';
 import '../data/proposal_repository.dart';
 import '../models/dispute_models.dart';
 import '../widgets/dispute_chat_bubble.dart';
@@ -11,11 +12,13 @@ import '../widgets/dispute_chat_input_bar.dart';
 class DisputeChatScreen extends ConsumerStatefulWidget {
   final String disputeId;
   final String disputeTitle;
+  final String initialStatus;
 
   const DisputeChatScreen({
     super.key,
     required this.disputeId,
     required this.disputeTitle,
+    this.initialStatus = 'OPEN',
   });
 
   @override
@@ -26,13 +29,14 @@ class _DisputeChatScreenState extends ConsumerState<DisputeChatScreen> {
   final ScrollController _scrollCtrl = ScrollController();
   Timer? _timer;
   List<DisputeChatMessageItem> _messages = [];
-  String _disputeStatus = 'OPEN';
+  late String _disputeStatus;
   bool _isLoading = true;
   bool _isSending = false;
 
   @override
   void initState() {
     super.initState();
+    _disputeStatus = widget.initialStatus;
     _fetchChat(initial: true);
     _timer = Timer.periodic(const Duration(milliseconds: 2500), (_) => _fetchChat(initial: false));
   }
@@ -115,8 +119,10 @@ class _DisputeChatScreenState extends ConsumerState<DisputeChatScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isSending = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppErrorFormatter.format(e, fallback: 'Không thể gửi tin nhắn.'))),
+        CaniSnackBar.show(
+          context,
+          message: AppErrorFormatter.format(e, fallback: 'Chưa gửi được tin nhắn. Vui lòng thử lại.'),
+          tone: CaniNoticeTone.error,
         );
       }
     }
@@ -126,7 +132,7 @@ class _DisputeChatScreenState extends ConsumerState<DisputeChatScreen> {
   Widget build(BuildContext context) {
     final cani = Theme.of(context).cani;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isClosed = _disputeStatus == 'FINAL_RESOLVED';
+    final isClosed = !WorkerDisputeItem.isStatusInProgress(_disputeStatus);
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
@@ -210,12 +216,12 @@ class _DisputeChatScreenState extends ConsumerState<DisputeChatScreen> {
                         itemBuilder: (_, idx) => DisputeChatBubble(message: _messages[idx]),
                       ),
           ),
-          DisputeChatInputBar(
-            onSend: _handleSend,
-            isSending: _isSending,
-            isClosed: isClosed,
-          ),
         ],
+      ),
+      bottomNavigationBar: DisputeChatInputBar(
+        onSend: _handleSend,
+        isSending: _isSending,
+        isClosed: isClosed,
       ),
     );
   }

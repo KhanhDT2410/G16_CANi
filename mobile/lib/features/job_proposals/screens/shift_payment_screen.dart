@@ -1,6 +1,8 @@
 import 'package:cani/app/cani_tokens.dart';
+import 'package:cani/core/utils/app_error_formatter.dart';
 import 'package:cani/features/profile/providers/worker_bank_provider.dart';
 import 'package:cani/features/profile/screens/worker_bank_settings_screen.dart';
+import 'package:cani/shared/widgets/cani_snackbar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -87,7 +89,7 @@ class _ShiftPaymentScreenState extends ConsumerState<ShiftPaymentScreen> {
     }
     return switch (status) {
       'DECLARED_PENDING_WORKER' => 'BTC đã khai báo · Chờ bạn xác nhận',
-      'NOT_DECLARED' => _assignment.eoConfirmed ? 'Chờ BTC thanh toán' : 'Chưa duyệt công (Bước 3)',
+      'NOT_DECLARED' => _assignment.eoConfirmed ? 'Chờ BTC thanh toán' : 'Đang chờ BTC duyệt công',
       'CONFIRMED_FULL' => 'Đã nhận đủ',
       'CONFIRMED_PARTIAL' => 'Nhận một phần',
       'DISPUTED' => 'Đang tranh chấp',
@@ -96,13 +98,11 @@ class _ShiftPaymentScreenState extends ConsumerState<ShiftPaymentScreen> {
   }
 
   Future<void> _handleConfirmPayment(String status) async {
-    final cani = Theme.of(context).cani;
     if (!_assignment.eoConfirmed && !_isCompleted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Ban tổ chức cần Duyệt công (Bước 3) trước khi xác nhận thanh toán.'),
-          backgroundColor: cani.warning,
-        ),
+      CaniSnackBar.show(
+        context,
+        message: 'Chưa thể xác nhận thanh toán vì đang chờ BTC duyệt công.',
+        tone: CaniNoticeTone.warning,
       );
       return;
     }
@@ -129,17 +129,14 @@ class _ShiftPaymentScreenState extends ConsumerState<ShiftPaymentScreen> {
       ref.invalidate(incomeSummaryProvider);
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            status == 'NOT_RECEIVED'
-                ? 'Đã ghi nhận phản hồi chưa nhận tiền — bạn có thể tiếp tục Check-out kết ca.'
-                : (status == 'RECEIVED_PARTIAL'
-                    ? 'Đã ghi nhận phản hồi nhận một phần — bạn có thể tiếp tục Check-out kết ca.'
-                    : 'Hai bên đã xác nhận thanh toán! Chuyển sang trang Check-out.'),
-          ),
-          backgroundColor: status == 'NOT_RECEIVED' ? cani.warning : cani.success,
-        ),
+      CaniSnackBar.show(
+        context,
+        message: status == 'NOT_RECEIVED'
+            ? 'Đã ghi nhận phản hồi chưa nhận tiền — bạn có thể tiếp tục Check-out kết ca.'
+            : (status == 'RECEIVED_PARTIAL'
+                ? 'Đã ghi nhận phản hồi nhận một phần — bạn có thể tiếp tục Check-out kết ca.'
+                : 'Hai bên đã xác nhận thanh toán! Chuyển sang trang Check-out.'),
+        tone: status == 'NOT_RECEIVED' ? CaniNoticeTone.warning : CaniNoticeTone.success,
       );
 
       if (!_isCompleted) {
@@ -147,11 +144,11 @@ class _ShiftPaymentScreenState extends ConsumerState<ShiftPaymentScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi xác nhận thanh toán: ${e.toString().replaceAll("Exception: ", "")}'),
-            backgroundColor: cani.danger,
-          ),
+        final reason = AppErrorFormatter.format(e, fallback: 'Vui lòng thử lại.');
+        CaniSnackBar.show(
+          context,
+          message: 'Chưa xác nhận được thanh toán. $reason',
+          tone: CaniNoticeTone.error,
         );
       }
     } finally {
@@ -705,8 +702,10 @@ class _ShiftPaymentScreenState extends ConsumerState<ShiftPaymentScreen> {
                                                 InkWell(
                                                   onTap: () {
                                                     Clipboard.setData(ClipboardData(text: cleanAcc));
-                                                    ScaffoldMessenger.of(context).showSnackBar(
-                                                      const SnackBar(content: Text('Đã sao chép số tài khoản')),
+                                                    CaniSnackBar.show(
+                                                      context,
+                                                      message: 'Đã sao chép số tài khoản.',
+                                                      tone: CaniNoticeTone.info,
                                                     );
                                                   },
                                                   child: Icon(Icons.copy_rounded, size: 14, color: cani.brand),
@@ -1015,11 +1014,9 @@ class _ShiftPaymentScreenState extends ConsumerState<ShiftPaymentScreen> {
               ),
             ),
           ),
-
-          // Sticky bottom CTA điều hướng sang Bước 5 (Check-out) / Bước 6 (Rating)
-          _buildBottomBar(cani, isDark),
         ],
       ),
+      bottomNavigationBar: _buildBottomBar(cani, isDark),
     );
   }
 

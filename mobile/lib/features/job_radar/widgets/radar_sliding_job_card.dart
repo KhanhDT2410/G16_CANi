@@ -1,5 +1,6 @@
 import 'package:cani/app/cani_tokens.dart';
 import 'package:cani/features/job_proposals/widgets/job_proposal_invite_card.dart';
+import 'package:cani/shared/widgets/cani_snackbar.dart';
 import 'package:flutter/material.dart';
 
 import 'package:cani/features/job_radar/models/job_radar_models.dart';
@@ -409,22 +410,22 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                 child: ElevatedButton(
                   onPressed: s.isConflicting
                       ? () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(s.conflictReason ?? 'Bạn đã có ca nhận rồi!'),
-                              backgroundColor: cani.warning,
-                            ),
+                          CaniSnackBar.show(
+                            context,
+                            message: s.conflictReason ?? 'Bạn đã có ca trùng khung giờ này.',
+                            tone: CaniNoticeTone.warning,
+                            bottomOffset: 76,
                           );
                         }
                       : (s.emergency
                           ? widget.onApply
                           : () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text(
-                                      'Ca này đang ghép đôi tự động (Matching). Ứng tuyển trực tiếp chỉ mở khi Ban tổ chức kích hoạt điều phối khẩn cấp!'),
-                                  backgroundColor: cani.warning,
-                                ),
+                              CaniSnackBar.show(
+                                context,
+                                message:
+                                    'Ca này đang ghép đôi tự động. Nhận ca trực tiếp chỉ mở khi Ban tổ chức bật điều phối khẩn cấp.',
+                                tone: CaniNoticeTone.warning,
+                                bottomOffset: 76,
                               );
                             }),
                   style: ElevatedButton.styleFrom(

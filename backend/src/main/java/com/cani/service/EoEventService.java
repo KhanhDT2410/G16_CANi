@@ -69,12 +69,12 @@ public class EoEventService {
     private static final double MIN_BILLABLE_HOURS = 0.5;
     private static final long DEFAULT_SHIFT_MINUTES = 240L;
     private static final BigDecimal DEFAULT_HOURLY_WAGE = BigDecimal.valueOf(50000);
-    // Sàn lương tối thiểu vùng theo Nghị định 293/2025/NĐ-CP (hiệu lực từ 01/01/2026)
+    // Sàn lương tối thiểu vùng theo Nghị định 293/2025/NĐ-CP (hiệu lực từ
+    // 01/01/2026)
     public static final BigDecimal REGION_1_STATUTORY_FLOOR = new BigDecimal("25500"); // Hà Nội, TP.HCM
     public static final BigDecimal REGION_2_STATUTORY_FLOOR = new BigDecimal("22700"); // Đà Nẵng
     public static final BigDecimal LEGAL_MIN_HOURLY_WAGE = REGION_2_STATUTORY_FLOOR;
-    public static final String LEGAL_MIN_HOURLY_WAGE_ERROR =
-            "Mức thù lao không được thấp hơn mức tối thiểu quy định theo Nghị định 293/2025/NĐ-CP";
+    public static final String LEGAL_MIN_HOURLY_WAGE_ERROR = "Mức thù lao không được thấp hơn mức tối thiểu quy định theo Nghị định 293/2025/NĐ-CP";
     private static final BigDecimal DEFAULT_RATING = BigDecimal.valueOf(5.0);
 
     private final EventOrganizerRepository eventOrganizerRepository;
@@ -125,6 +125,12 @@ public class EoEventService {
     private DispatchProposalRepository dispatchProposalRepository;
 
     @Autowired(required = false)
+    private GeoWageRegionResolver geoWageRegionResolver;
+
+    @Autowired(required = false)
+    private WageRegionRepository wageRegionRepository;
+
+    @Autowired(required = false)
     private ShiftStaffingPolicy shiftStaffingPolicy;
 
     @Autowired(required = false)
@@ -139,8 +145,7 @@ public class EoEventService {
         }
         return ShiftStaffingPolicy.withFallbackDependencies(
                 shiftAssignmentRepository,
-                dispatchProposalRepository
-        );
+                dispatchProposalRepository);
     }
 
     private EoEventQueryService getEventQueryService() {
@@ -157,8 +162,7 @@ public class EoEventService {
                 dispatchProposalRepository,
                 shiftSkillRequirementRepository,
                 skillRepository,
-                getStaffingPolicy()
-        );
+                getStaffingPolicy());
     }
 
     /**
@@ -169,10 +173,12 @@ public class EoEventService {
         EventOrganizer eo = getEoOrThrow(userId);
 
         if (eo.getVerificationStatus() != VerificationStatus.APPROVED) {
-            throw new BadRequestException("Tài khoản của bạn chưa hoàn tất định danh eKYC. Vui lòng xác thực eKYC trước khi tạo sự kiện và tuyển dụng nhân sự trên CANi.");
+            throw new BadRequestException(
+                    "Tài khoản của bạn chưa hoàn tất định danh eKYC. Vui lòng xác thực eKYC trước khi tạo sự kiện và tuyển dụng nhân sự trên CANi.");
         }
 
-        validateEventDetails(dto.getName(), dto.getDescription(), dto.getVenueAddress(), dto.getStartTime(), dto.getEndTime());
+        validateEventDetails(dto.getName(), dto.getDescription(), dto.getVenueAddress(), dto.getStartTime(),
+                dto.getEndTime());
         validateFutureStartTime(dto.getStartTime(), "Thời gian bắt đầu sự kiện không được nằm trong quá khứ.");
 
         Event event = Event.builder()
@@ -213,7 +219,8 @@ public class EoEventService {
             throw new BadRequestException("Không thể chỉnh sửa sự kiện đã hoàn thành hoặc đã bị hủy.");
         }
 
-        validateEventDetails(dto.getName(), dto.getDescription(), dto.getVenueAddress(), dto.getStartTime(), dto.getEndTime());
+        validateEventDetails(dto.getName(), dto.getDescription(), dto.getVenueAddress(), dto.getStartTime(),
+                dto.getEndTime());
         if (event.getStatus() == EventStatus.DRAFT && dto.getStartTime() != null) {
             validateFutureStartTime(dto.getStartTime(), "Thời gian bắt đầu sự kiện không được nằm trong quá khứ.");
         }
@@ -221,13 +228,20 @@ public class EoEventService {
         event.setName(dto.getName());
         event.setDescription(dto.getDescription());
         event.setVenueAddress(dto.getVenueAddress());
-        if (dto.getVenueLat() != null) event.setVenueLat(dto.getVenueLat());
-        if (dto.getVenueLng() != null) event.setVenueLng(dto.getVenueLng());
-        if (dto.getEventDate() != null) event.setEventDate(dto.getEventDate());
-        if (dto.getStartTime() != null) event.setStartTime(dto.getStartTime());
-        if (dto.getEndTime() != null) event.setEndTime(dto.getEndTime());
-        if (dto.getImageUrl() != null) event.setImageUrl(dto.getImageUrl().trim());
-        if (dto.getMode() != null) event.setMode(dto.getMode());
+        if (dto.getVenueLat() != null)
+            event.setVenueLat(dto.getVenueLat());
+        if (dto.getVenueLng() != null)
+            event.setVenueLng(dto.getVenueLng());
+        if (dto.getEventDate() != null)
+            event.setEventDate(dto.getEventDate());
+        if (dto.getStartTime() != null)
+            event.setStartTime(dto.getStartTime());
+        if (dto.getEndTime() != null)
+            event.setEndTime(dto.getEndTime());
+        if (dto.getImageUrl() != null)
+            event.setImageUrl(dto.getImageUrl().trim());
+        if (dto.getMode() != null)
+            event.setMode(dto.getMode());
 
         event = eventRepository.save(event);
         log.info("EO {} đã cập nhật sự kiện: {}", userId, event.getEventId());
@@ -269,11 +283,13 @@ public class EoEventService {
         event.setStatus(EventStatus.CANCELLED);
         event = eventRepository.save(event);
 
-        // Trả lại quota khi hủy mà event chưa bắt đầu (chỉ với event đã tiêu quota: MATCHING & ACTIVE)
+        // Trả lại quota khi hủy mà event chưa bắt đầu (chỉ với event đã tiêu quota:
+        // MATCHING & ACTIVE)
         if (isMatching && notStartedYet && prevStatus == EventStatus.ACTIVE && subscriptionService != null) {
             try {
                 subscriptionService.refundEventQuota(eo);
-                log.info("Hoàn trả 1 quota sự kiện cho EO {} do hủy sự kiện {} trước giờ bắt đầu", eo.getEoId(), eventId);
+                log.info("Hoàn trả 1 quota sự kiện cho EO {} do hủy sự kiện {} trước giờ bắt đầu", eo.getEoId(),
+                        eventId);
             } catch (Exception ex) {
                 log.warn("Không thể hoàn trả quota khi hủy sự kiện: {}", ex.getMessage());
             }
@@ -311,14 +327,14 @@ public class EoEventService {
             throw new BadRequestException("Phụ cấp thêm không được là số âm!");
         }
         validateShiftHourlyWage(event, dto.getHourlyWage());
-        BigDecimal shiftCost = calculateShiftTotalCost(dto.getStartTime(), dto.getEndTime(), dto.getHourlyWage(), workers, allowance);
+        BigDecimal shiftCost = calculateShiftTotalCost(dto.getStartTime(), dto.getEndTime(), dto.getHourlyWage(),
+                workers, allowance);
 
         PreparedShiftSkillConfig skillConfig = prepareShiftSkillConfig(
                 dto.getPerformedSkillId(),
                 dto.getRequiredSkills(),
                 dto.getSkillRequirements(),
-                dto.getCustomSkillNotes()
-        );
+                dto.getCustomSkillNotes());
 
         Shift shift = Shift.builder()
                 .event(event)
@@ -352,8 +368,10 @@ public class EoEventService {
         shiftRepository.flush();
 
         event.setTotalShifts((event.getTotalShifts() != null ? event.getTotalShifts() : 0) + 1);
-        event.setTotalRequiredWorkers((event.getTotalRequiredWorkers() != null ? event.getTotalRequiredWorkers() : 0) + workers);
-        BigDecimal currentCost = event.getTotalEstimatedCost() != null ? event.getTotalEstimatedCost() : BigDecimal.ZERO;
+        event.setTotalRequiredWorkers(
+                (event.getTotalRequiredWorkers() != null ? event.getTotalRequiredWorkers() : 0) + workers);
+        BigDecimal currentCost = event.getTotalEstimatedCost() != null ? event.getTotalEstimatedCost()
+                : BigDecimal.ZERO;
         event.setTotalEstimatedCost(currentCost.add(shiftCost));
         eventRepository.save(event);
 
@@ -369,13 +387,15 @@ public class EoEventService {
             log.info("Đã thêm ca làm việc '{}' (cần {} người) vào sự kiện INVITE {} — bỏ qua auto-matching",
                     shift.getJobType(), workers, event.getName());
         } else {
-            log.info("Đã thêm ca làm việc '{}' (cần {} người) vào sự kiện {}", shift.getJobType(), workers, event.getName());
+            log.info("Đã thêm ca làm việc '{}' (cần {} người) vào sự kiện {}", shift.getJobType(), workers,
+                    event.getName());
         }
         return mapToShiftResponseDto(shift);
     }
 
     /**
-     * UC-20 (WBS 74.0): EO tạo hàng loạt ca làm việc theo mẫu khung giờ (Bulk Create Shifts)
+     * UC-20 (WBS 74.0): EO tạo hàng loạt ca làm việc theo mẫu khung giờ (Bulk
+     * Create Shifts)
      */
     @Transactional
     public List<ShiftResponseDto> addBulkShifts(UUID userId, UUID eventId, CreateBulkShiftsRequestDto dto) {
@@ -397,8 +417,10 @@ public class EoEventService {
             validateShiftWithinEvent(event, slot.getStartTime(), slot.getEndTime());
             validateNoDuplicateShift(eventId, dto.getJobType(), slot.getStartTime(), slot.getEndTime(), null);
             for (CreateBulkShiftsRequestDto.TimeSlotItem prevSlot : seenSlots) {
-                if (isSameMinuteSlot(prevSlot.getStartTime(), prevSlot.getEndTime(), slot.getStartTime(), slot.getEndTime())) {
-                    throw new BadRequestException("Danh sách khung giờ tạo hàng loạt bị trùng lặp ở vị trí \"" + dto.getJobType().trim() + "\".");
+                if (isSameMinuteSlot(prevSlot.getStartTime(), prevSlot.getEndTime(), slot.getStartTime(),
+                        slot.getEndTime())) {
+                    throw new BadRequestException("Danh sách khung giờ tạo hàng loạt bị trùng lặp ở vị trí \""
+                            + dto.getJobType().trim() + "\".");
                 }
             }
             seenSlots.add(slot);
@@ -407,12 +429,12 @@ public class EoEventService {
                 dto.getPerformedSkillId(),
                 dto.getRequiredSkills(),
                 dto.getSkillRequirements(),
-                dto.getCustomSkillNotes()
-        );
+                dto.getCustomSkillNotes());
         for (CreateBulkShiftsRequestDto.TimeSlotItem slot : dto.getTimeSlots()) {
             validateFutureStartTime(slot.getStartTime(), "Thời gian bắt đầu ca làm việc không được nằm trong quá khứ.");
             validateShiftWithinEvent(event, slot.getStartTime(), slot.getEndTime());
-            BigDecimal shiftCost = calculateShiftTotalCost(slot.getStartTime(), slot.getEndTime(), dto.getHourlyWage(), workers, allowance);
+            BigDecimal shiftCost = calculateShiftTotalCost(slot.getStartTime(), slot.getEndTime(), dto.getHourlyWage(),
+                    workers, allowance);
 
             Shift shift = Shift.builder()
                     .event(event)
@@ -428,7 +450,8 @@ public class EoEventService {
                     .allowance(allowance)
                     .totalCost(shiftCost)
                     .status(event.getStatus() == EventStatus.ACTIVE ? ShiftStatus.ACTIVE : ShiftStatus.DRAFT)
-                    .locationAddress(dto.getLocationAddress() != null ? dto.getLocationAddress() : event.getVenueAddress())
+                    .locationAddress(
+                            dto.getLocationAddress() != null ? dto.getLocationAddress() : event.getVenueAddress())
                     .locationLat(dto.getLocationLat() != null ? dto.getLocationLat() : event.getVenueLat())
                     .locationLng(dto.getLocationLng() != null ? dto.getLocationLng() : event.getVenueLng())
                     .requiredSkills(skillConfig.requiredSkillIdsArray())
@@ -444,15 +467,18 @@ public class EoEventService {
             shiftRepository.flush();
 
             event.setTotalShifts((event.getTotalShifts() != null ? event.getTotalShifts() : 0) + 1);
-            event.setTotalRequiredWorkers((event.getTotalRequiredWorkers() != null ? event.getTotalRequiredWorkers() : 0) + workers);
-            BigDecimal currentCost = event.getTotalEstimatedCost() != null ? event.getTotalEstimatedCost() : BigDecimal.ZERO;
+            event.setTotalRequiredWorkers(
+                    (event.getTotalRequiredWorkers() != null ? event.getTotalRequiredWorkers() : 0) + workers);
+            BigDecimal currentCost = event.getTotalEstimatedCost() != null ? event.getTotalEstimatedCost()
+                    : BigDecimal.ZERO;
             event.setTotalEstimatedCost(currentCost.add(shiftCost));
 
             if (event.getStatus() == EventStatus.ACTIVE && !isInviteMode(event)) {
                 try {
                     matchingDispatchService.dispatchForShift(shift.getShiftId());
                 } catch (Exception e) {
-                    log.warn("Thêm ca bulk '{}' thất bại dispatch tìm ứng viên: {}", shift.getJobType(), e.getMessage());
+                    log.warn("Thêm ca bulk '{}' thất bại dispatch tìm ứng viên: {}", shift.getJobType(),
+                            e.getMessage());
                 }
             }
             results.add(mapToShiftResponseDto(shift));
@@ -497,11 +523,14 @@ public class EoEventService {
             BigDecimal incomingHourly = dto.getHourlyWage() != null ? dto.getHourlyWage() : BigDecimal.ZERO;
             BigDecimal existingAllowance = shift.getAllowance() != null ? shift.getAllowance() : BigDecimal.ZERO;
             if (incomingHourly.compareTo(existingHourly) != 0 || allowance.compareTo(existingAllowance) != 0) {
-                throw new BadRequestException("Ca làm việc đã vào giờ diễn ra, không thể chỉnh sửa mức thù lao hoặc phụ cấp.");
+                throw new BadRequestException(
+                        "Ca làm việc đã vào giờ diễn ra, không thể chỉnh sửa mức thù lao hoặc phụ cấp.");
             }
 
             if (workers < confirmed) {
-                throw new BadRequestException("Ca làm việc đã vào giờ diễn ra, số nhân sự cần tuyển không được nhỏ hơn số nhân sự đã nhận ca (" + confirmed + " người).");
+                throw new BadRequestException(
+                        "Ca làm việc đã vào giờ diễn ra, số nhân sự cần tuyển không được nhỏ hơn số nhân sự đã nhận ca ("
+                                + confirmed + " người).");
             }
         }
 
@@ -509,13 +538,16 @@ public class EoEventService {
         validateShiftArrivalTime(dto.getStartTime(), dto.getArrivalTime());
         validateShiftJobType(dto.getJobType());
         if (shift.getEvent() != null) {
-            validateNoDuplicateShift(shift.getEvent().getEventId(), dto.getJobType(), dto.getStartTime(), dto.getEndTime(), shiftId);
+            validateNoDuplicateShift(shift.getEvent().getEventId(), dto.getJobType(), dto.getStartTime(),
+                    dto.getEndTime(), shiftId);
         }
 
         validateShiftHourlyWage(shift.getEvent(), dto.getHourlyWage());
-        BigDecimal newShiftCost = calculateShiftTotalCost(dto.getStartTime(), dto.getEndTime(), dto.getHourlyWage(), workers, allowance);
+        BigDecimal newShiftCost = calculateShiftTotalCost(dto.getStartTime(), dto.getEndTime(), dto.getHourlyWage(),
+                workers, allowance);
 
-        BigDecimal costDiff = newShiftCost.subtract(shift.getTotalCost() != null ? shift.getTotalCost() : BigDecimal.ZERO);
+        BigDecimal costDiff = newShiftCost
+                .subtract(shift.getTotalCost() != null ? shift.getTotalCost() : BigDecimal.ZERO);
         int workerDiff = workers - (shift.getRequiredWorkers() != null ? shift.getRequiredWorkers() : 0);
 
         shift.setJobType(dto.getJobType());
@@ -527,8 +559,7 @@ public class EoEventService {
                 dto.getPerformedSkillId() != null ? dto.getPerformedSkillId() : shift.getPerformedSkillId(),
                 dto.getRequiredSkills(),
                 dto.getSkillRequirements(),
-                dto.getCustomSkillNotes() != null ? dto.getCustomSkillNotes() : shift.getCustomSkillNotes()
-        );
+                dto.getCustomSkillNotes() != null ? dto.getCustomSkillNotes() : shift.getCustomSkillNotes());
         shift.setRequiredSkills(skillConfig.requiredSkillIdsArray());
         if (dto.getPerformedSkillId() != null) {
             shift.setPerformedSkillId(skillConfig.performedSkillId());
@@ -550,13 +581,20 @@ public class EoEventService {
         shift.setHourlyWage(dto.getHourlyWage());
         shift.setAllowance(allowance);
         shift.setTotalCost(newShiftCost);
-        if (dto.getMinReliabilityScore() != null) shift.setMinReliabilityScore(dto.getMinReliabilityScore());
-        if (dto.getMaxDistanceKm() != null) shift.setMaxDistanceKm(dto.getMaxDistanceKm());
-        if (dto.getDressCode() != null) shift.setDressCode(dto.getDressCode());
-        if (dto.getLocationAddress() != null) shift.setLocationAddress(dto.getLocationAddress());
-        if (dto.getLocationLat() != null) shift.setLocationLat(dto.getLocationLat());
-        if (dto.getLocationLng() != null) shift.setLocationLng(dto.getLocationLng());
-        if (dto.getChecklist() != null) shift.setChecklist(dto.getChecklist());
+        if (dto.getMinReliabilityScore() != null)
+            shift.setMinReliabilityScore(dto.getMinReliabilityScore());
+        if (dto.getMaxDistanceKm() != null)
+            shift.setMaxDistanceKm(dto.getMaxDistanceKm());
+        if (dto.getDressCode() != null)
+            shift.setDressCode(dto.getDressCode());
+        if (dto.getLocationAddress() != null)
+            shift.setLocationAddress(dto.getLocationAddress());
+        if (dto.getLocationLat() != null)
+            shift.setLocationLat(dto.getLocationLat());
+        if (dto.getLocationLng() != null)
+            shift.setLocationLng(dto.getLocationLng());
+        if (dto.getChecklist() != null)
+            shift.setChecklist(dto.getChecklist());
 
         shift = shiftRepository.save(shift);
         boolean shouldSyncRequirements = dto.getSkillRequirements() != null || dto.getRequiredSkills() != null;
@@ -566,8 +604,10 @@ public class EoEventService {
 
         Event event = shift.getEvent();
         if (event != null) {
-            event.setTotalRequiredWorkers((event.getTotalRequiredWorkers() != null ? event.getTotalRequiredWorkers() : 0) + workerDiff);
-            BigDecimal currentCost = event.getTotalEstimatedCost() != null ? event.getTotalEstimatedCost() : BigDecimal.ZERO;
+            event.setTotalRequiredWorkers(
+                    (event.getTotalRequiredWorkers() != null ? event.getTotalRequiredWorkers() : 0) + workerDiff);
+            BigDecimal currentCost = event.getTotalEstimatedCost() != null ? event.getTotalEstimatedCost()
+                    : BigDecimal.ZERO;
             event.setTotalEstimatedCost(currentCost.add(costDiff));
             eventRepository.save(event);
         }
@@ -617,14 +657,16 @@ public class EoEventService {
                 .jobType(shift.getJobType())
                 .startTime(shift.getStartTime())
                 .endTime(shift.getEndTime())
-                .venueAddress(shift.getLocationAddress() != null ? shift.getLocationAddress() : (event != null ? event.getVenueAddress() : ""))
+                .venueAddress(shift.getLocationAddress() != null ? shift.getLocationAddress()
+                        : (event != null ? event.getVenueAddress() : ""))
                 .checkinQrContent(checkinData + ":" + checkinSig)
                 .checkoutQrContent(checkoutData + ":" + checkoutSig)
                 .build();
     }
 
     /**
-     * UC-48: Bảng theo dõi điểm danh trực tiếp của Ca làm việc (Live Attendance Dashboard)
+     * UC-48: Bảng theo dõi điểm danh trực tiếp của Ca làm việc (Live Attendance
+     * Dashboard)
      */
     @Transactional(readOnly = true)
     public List<ShiftAttendanceDto> getShiftAttendanceList(UUID userId, UUID shiftId) {
@@ -657,7 +699,8 @@ public class EoEventService {
     }
 
     /**
-     * UC-49 + Skill V3: EO xác nhận hoàn thành ca, duyệt công và xác nhận kỹ năng thực hiện chính để cấp SP
+     * UC-49 + Skill V3: EO xác nhận hoàn thành ca, duyệt công và xác nhận kỹ năng
+     * thực hiện chính để cấp SP
      */
     @Transactional
     public ShiftAttendanceDto verifyAttendance(UUID userId, UUID assignmentId, VerifyAttendanceRequestDto request) {
@@ -674,19 +717,26 @@ public class EoEventService {
         }
 
         Shift shift = sa.getShift();
-        if (shift != null && shift.getChecklist() != null && !shift.getChecklist().isBlank() && workerJobService != null) {
-            List<com.cani.dto.worker.ShiftChecklistItemDto> templateItems = workerJobService.parseChecklistTemplate(shift.getChecklist());
-            Map<String, com.cani.dto.worker.ChecklistProgressDto> progressMap = workerJobService.parseChecklistProgress(sa.getChecklistProgress());
+        if (shift != null && shift.getChecklist() != null && !shift.getChecklist().isBlank()
+                && workerJobService != null) {
+            List<com.cani.dto.worker.ShiftChecklistItemDto> templateItems = workerJobService
+                    .parseChecklistTemplate(shift.getChecklist());
+            Map<String, com.cani.dto.worker.ChecklistProgressDto> progressMap = workerJobService
+                    .parseChecklistProgress(sa.getChecklistProgress());
             for (com.cani.dto.worker.ShiftChecklistItemDto item : templateItems) {
                 com.cani.dto.worker.ChecklistProgressDto prog = progressMap.get(item.getId());
                 boolean isDone = prog != null && Boolean.TRUE.equals(prog.getIsCompleted());
                 if (!isDone) {
-                    throw new BadRequestException("Chưa đủ điều kiện duyệt công: Đầu việc \"" + (item.getTitle() != null ? item.getTitle() : item.getId()) + "\" chưa được hoàn thành.");
+                    throw new BadRequestException("Chưa đủ điều kiện duyệt công: Đầu việc \""
+                            + (item.getTitle() != null ? item.getTitle() : item.getId()) + "\" chưa được hoàn thành.");
                 }
                 if (Boolean.TRUE.equals(item.getIsRequiredEvidence())) {
-                    boolean hasProof = prog != null && prog.getEvidenceImageUrl() != null && !prog.getEvidenceImageUrl().isBlank();
+                    boolean hasProof = prog != null && prog.getEvidenceImageUrl() != null
+                            && !prog.getEvidenceImageUrl().isBlank();
                     if (!hasProof) {
-                        throw new BadRequestException("Chưa đủ điều kiện duyệt công: Đầu việc \"" + (item.getTitle() != null ? item.getTitle() : item.getId()) + "\" yêu cầu ảnh minh chứng nhưng chưa được nộp.");
+                        throw new BadRequestException("Chưa đủ điều kiện duyệt công: Đầu việc \""
+                                + (item.getTitle() != null ? item.getTitle() : item.getId())
+                                + "\" yêu cầu ảnh minh chứng nhưng chưa được nộp.");
                     }
                 }
             }
@@ -696,9 +746,9 @@ public class EoEventService {
         if (request != null && request.getConfirmedPerformedSkillId() != null) {
             Skill confirmedSkill = validateAndResolveActiveSkill(
                     request.getConfirmedPerformedSkillId(),
-                    "Kỹ năng thực hiện chính"
-            );
-            confirmedSkillId = confirmedSkill != null ? confirmedSkill.getSkillId() : request.getConfirmedPerformedSkillId();
+                    "Kỹ năng thực hiện chính");
+            confirmedSkillId = confirmedSkill != null ? confirmedSkill.getSkillId()
+                    : request.getConfirmedPerformedSkillId();
         } else if (sa.getConfirmedPerformedSkillId() != null) {
             confirmedSkillId = sa.getConfirmedPerformedSkillId();
         } else if (shift != null && shift.getPerformedSkillId() != null) {
@@ -719,38 +769,47 @@ public class EoEventService {
         }
         sa = shiftAssignmentRepository.save(sa);
 
-        // Chỉ cộng thêm số ca hoàn thành cho Worker nếu không phải đang chờ check-out và chưa COMPLETED trước đó
+        // Chỉ cộng thêm số ca hoàn thành cho Worker nếu không phải đang chờ check-out
+        // và chưa COMPLETED trước đó
         Worker worker = sa.getWorker();
         if (worker != null && !isInShiftAwaitingCheckout && !wasAlreadyCompleted) {
-            worker.setTotalShiftsCompleted((worker.getTotalShiftsCompleted() != null ? worker.getTotalShiftsCompleted() : 0) + 1);
+            worker.setTotalShiftsCompleted(
+                    (worker.getTotalShiftsCompleted() != null ? worker.getTotalShiftsCompleted() : 0) + 1);
             workerRepository.save(worker);
         }
 
-        // Cấp SP_experience idempotent khi Assignment đã COMPLETED và đã qua xác nhận của EO
-        // (Không làm chặn payment hoặc verifyAttendance nếu dữ liệu kỹ năng ca cũ bị thiếu)
+        // Cấp SP_experience idempotent khi Assignment đã COMPLETED và đã qua xác nhận
+        // của EO
+        // (Không làm chặn payment hoặc verifyAttendance nếu dữ liệu kỹ năng ca cũ bị
+        // thiếu)
         boolean skillConfirmationAllowed = request == null || !Boolean.FALSE.equals(request.getConfirmPerformedSkill());
-        if (worker != null && !isInShiftAwaitingCheckout && skillConfirmationAllowed && skillProgressionService != null) {
+        if (worker != null && !isInShiftAwaitingCheckout && skillConfirmationAllowed
+                && skillProgressionService != null) {
             skillProgressionService.recordCompletedShiftForAssignment(sa, confirmedSkillId);
         }
 
-        log.info("EO {} đã duyệt hoàn thành ca cho Assignment {} (inShiftAwaitingCheckout={})", userId, assignmentId, isInShiftAwaitingCheckout);
+        log.info("EO {} đã duyệt hoàn thành ca cho Assignment {} (inShiftAwaitingCheckout={})", userId, assignmentId,
+                isInShiftAwaitingCheckout);
 
         BigDecimal agreedWage = calculateSingleWorkerAgreedWage(shift);
 
-        // WBS 246.0: Tính toán tiền công thực tế từ số giờ làm việc thực tế (Actual Hours & Payment)
+        // WBS 246.0: Tính toán tiền công thực tế từ số giờ làm việc thực tế (Actual
+        // Hours & Payment)
         BigDecimal actualAmount = agreedWage;
         if (shift != null && shift.getHourlyWage() != null) {
             BigDecimal hourly = shift.getHourlyWage();
             BigDecimal allowance = shift.getAllowance() != null ? shift.getAllowance() : BigDecimal.ZERO;
             if (attOpt.get().getHoursWorked() != null) {
-                actualAmount = hourly.multiply(attOpt.get().getHoursWorked()).add(allowance).setScale(0, RoundingMode.HALF_UP);
+                actualAmount = hourly.multiply(attOpt.get().getHoursWorked()).add(allowance).setScale(0,
+                        RoundingMode.HALF_UP);
             } else if (attOpt.get().getCheckinTime() != null) {
                 Instant checkin = attOpt.get().getCheckinTime();
                 Instant now = Instant.now();
                 Instant endTime = shift.getEndTime() != null ? shift.getEndTime() : now;
                 Instant effectiveEnd = now.isBefore(endTime) ? now : endTime;
                 long minutes = Math.max(30, Duration.between(checkin, effectiveEnd).toMinutes());
-                BigDecimal hoursWorked = BigDecimal.valueOf(minutes).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+                BigDecimal hoursWorked = BigDecimal.valueOf(minutes).divide(BigDecimal.valueOf(60), 2,
+                        RoundingMode.HALF_UP);
                 actualAmount = hourly.multiply(hoursWorked).add(allowance).setScale(0, RoundingMode.HALF_UP);
             }
         }
@@ -766,41 +825,44 @@ public class EoEventService {
                 .status(com.cani.entity.enums.PaymentStatus.NOT_DECLARED)
                 .build());
 
-        // Chỉ cập nhật agreedAmount tính theo giờ thực tế nếu Payment chưa được EO khai báo thanh toán (NOT_DECLARED)
+        // Chỉ cập nhật agreedAmount tính theo giờ thực tế nếu Payment chưa được EO khai
+        // báo thanh toán (NOT_DECLARED)
         if (payment.getStatus() == com.cani.entity.enums.PaymentStatus.NOT_DECLARED) {
             payment.setAgreedAmount(actualAmount);
             paymentRepository.save(payment);
         }
 
-        if (notificationService != null && worker != null && worker.getUser() != null && worker.getUser().getUserId() != null) {
+        if (notificationService != null && worker != null && worker.getUser() != null
+                && worker.getUser().getUserId() != null) {
             try {
                 String evName = (shift != null && shift.getEvent() != null) ? shift.getEvent().getName() : "Sự kiện";
                 String shiftTitle = shift != null ? shift.getJobType() : "ca làm việc";
                 notificationService.createAndSend(
                         worker.getUser().getUserId(),
                         "BTC đã duyệt công việc của bạn",
-                        "Ban tổ chức đã xác nhận nghiệm thu ca \"" + shiftTitle + "\" (" + evName + "). Đang chờ thanh toán thù lao.",
+                        "Ban tổ chức đã xác nhận nghiệm thu ca \"" + shiftTitle + "\" (" + evName
+                                + "). Đang chờ thanh toán thù lao.",
                         com.cani.entity.enums.NotificationType.ASSIGNMENT,
                         "ASSIGNMENT",
                         assignmentId,
-                        Map.of("assignmentId", assignmentId.toString(), "type", "EO_CONFIRMED")
-                );
+                        Map.of("assignmentId", assignmentId.toString(), "type", "EO_CONFIRMED"));
             } catch (Exception ex) {
                 log.warn("Không thể gửi thông báo duyệt công tới Worker: {}", ex.getMessage());
             }
         }
 
-        String checklistSummary = computeChecklistSummary(shift != null ? shift.getChecklist() : null, sa.getChecklistProgress());
+        String checklistSummary = computeChecklistSummary(shift != null ? shift.getChecklist() : null,
+                sa.getChecklistProgress());
         return mapToShiftAttendanceDto(sa, resolveEoUserId(eo, userId), actualAmount, checklistSummary);
     }
 
     /**
-     * UC-83: EO báo cáo công việc chưa hoàn thành / chất lượng không đạt (Report Incomplete Work)
+     * UC-83: EO báo cáo công việc chưa hoàn thành / chất lượng không đạt (Report
+     * Incomplete Work)
      */
     @Transactional
     public com.cani.dto.dispute.DisputeDetailResponseDto reportIncompleteWork(
-            UUID userId, UUID assignmentId, ReportIncompleteWorkRequestDto request
-    ) {
+            UUID userId, UUID assignmentId, ReportIncompleteWorkRequestDto request) {
         EventOrganizer eo = getEoOrThrow(userId);
         ShiftAssignment sa = getOwnedAssignmentOrThrow(assignmentId, eo.getEoId());
 
@@ -814,15 +876,18 @@ public class EoEventService {
 
         Map<String, Object> evidenceMap = new HashMap<>();
         evidenceMap.put("proofUrls", request.getProofUrls() != null ? request.getProofUrls() : List.of());
-        evidenceMap.put("incompleteChecklistItems", request.getIncompleteChecklistItems() != null ? request.getIncompleteChecklistItems() : List.of());
+        evidenceMap.put("incompleteChecklistItems",
+                request.getIncompleteChecklistItems() != null ? request.getIncompleteChecklistItems() : List.of());
         String evidenceJson = null;
         try {
             evidenceJson = objectMapper.writeValueAsString(evidenceMap);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         String description = request.getReason();
         if (description.length() < 50) {
-            description = String.format("Báo cáo công việc ca [%s] thuộc sự kiện [%s] không đạt yêu cầu: %s (Chi tiết do Ban tổ chức gửi phản ánh)",
+            description = String.format(
+                    "Báo cáo công việc ca [%s] thuộc sự kiện [%s] không đạt yêu cầu: %s (Chi tiết do Ban tổ chức gửi phản ánh)",
                     shiftTitle, eventName, request.getReason());
         }
 
@@ -836,24 +901,28 @@ public class EoEventService {
 
         sa.setEoConfirmed(false);
         if (workerJobService != null && sa.getChecklistProgress() != null) {
-            Map<String, com.cani.dto.worker.ChecklistProgressDto> progressMap = workerJobService.parseChecklistProgress(sa.getChecklistProgress());
+            Map<String, com.cani.dto.worker.ChecklistProgressDto> progressMap = workerJobService
+                    .parseChecklistProgress(sa.getChecklistProgress());
             if (progressMap.containsKey("__META_READY_NOTIFIED__")) {
                 progressMap.remove("__META_READY_NOTIFIED__");
                 try {
                     sa.setChecklistProgress(objectMapper.writeValueAsString(progressMap));
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
         }
         shiftAssignmentRepository.save(sa);
 
         com.cani.dto.dispute.DisputeDetailResponseDto dispute = disputeService.createDispute(userId, disputeReq);
-        log.info("EO {} đã báo cáo công việc không đạt cho assignment {}: disputeId={}", eo.getEoId(), assignmentId, dispute.getId());
+        log.info("EO {} đã báo cáo công việc không đạt cho assignment {}: disputeId={}", eo.getEoId(), assignmentId,
+                dispute.getId());
         return dispute;
     }
 
     /**
      * UC-88: EO báo cáo Worker vắng mặt không báo trước (Report No-Show)
-     * Kích hoạt chế tài phạt 25 RS, tự động khóa tài khoản nếu RS < 20 và kích hoạt Emergency Dispatch bù người.
+     * Kích hoạt chế tài phạt 25 RS, tự động khóa tài khoản nếu RS < 20 và kích hoạt
+     * Emergency Dispatch bù người.
      */
     @Transactional
     public NoShowResponseDto reportNoShow(UUID userId, UUID assignmentId, ReportNoShowRequestDto request) {
@@ -896,12 +965,14 @@ public class EoEventService {
         boolean hasCheckedOut = (attOpt.isPresent() && attOpt.get().getCheckoutTime() != null)
                 || sa.getStatus() == AssignmentStatus.COMPLETED;
         if (!hasCheckedOut) {
-            throw new BadRequestException("Chỉ có thể đánh giá nhân sự sau khi nhân sự đã hoàn thành Check-out ca làm việc.");
+            throw new BadRequestException(
+                    "Chỉ có thể đánh giá nhân sự sau khi nhân sự đã hoàn thành Check-out ca làm việc.");
         }
 
         if (disputeRepository != null && disputeRepository.existsByAssignmentIdAndStatusIn(
                 assignmentId, List.of(DisputeStatus.OPEN, DisputeStatus.INVESTIGATING, DisputeStatus.ESCALATED))) {
-            throw new BadRequestException("Ca làm việc đang có tranh chấp chưa được giải quyết. Vui lòng hoàn tất xử lý tranh chấp trước khi gửi đánh giá.");
+            throw new BadRequestException(
+                    "Ca làm việc đang có tranh chấp chưa được giải quyết. Vui lòng hoàn tất xử lý tranh chấp trước khi gửi đánh giá.");
         }
 
         Worker worker = sa.getWorker();
@@ -927,12 +998,14 @@ public class EoEventService {
             skillProgressionService.recordShiftRatingForAssignment(sa, request.getRating());
         }
 
-        log.info("EO {} đã đánh giá {} sao cho Worker {} (Assignment: {})", eoUserId, request.getRating(), worker.getWorkerId(), assignmentId);
+        log.info("EO {} đã đánh giá {} sao cho Worker {} (Assignment: {})", eoUserId, request.getRating(),
+                worker.getWorkerId(), assignmentId);
         return review;
     }
 
     /**
-     * Tổng hợp danh sách nhân sự đã tham gia ca để EO quản lý & đánh giá tập trung (Batch O(1) queries).
+     * Tổng hợp danh sách nhân sự đã tham gia ca để EO quản lý & đánh giá tập trung
+     * (Batch O(1) queries).
      */
     @Transactional(readOnly = true)
     public List<EoWorkerReviewItemDto> getWorkerReviewOverview(UUID userId) {
@@ -941,8 +1014,7 @@ public class EoEventService {
 
         List<ShiftAssignment> assignments = shiftAssignmentRepository.findCollaboratedWorkersByEoId(
                 eo.getEoId(),
-                List.of(AssignmentStatus.CONFIRMED, AssignmentStatus.CHECKED_IN, AssignmentStatus.COMPLETED)
-        );
+                List.of(AssignmentStatus.CONFIRMED, AssignmentStatus.CHECKED_IN, AssignmentStatus.COMPLETED));
         if (assignments == null || assignments.isEmpty()) {
             return Collections.emptyList();
         }
@@ -957,7 +1029,8 @@ public class EoEventService {
             List<AttendanceLog> logs = attendanceLogRepository.findByShiftAssignment_AssignmentIdIn(assignmentIds);
             if (logs != null) {
                 for (AttendanceLog al : logs) {
-                    if (al != null && al.getShiftAssignment() != null && al.getShiftAssignment().getAssignmentId() != null) {
+                    if (al != null && al.getShiftAssignment() != null
+                            && al.getShiftAssignment().getAssignmentId() != null) {
                         attendanceByAssignmentId.put(al.getShiftAssignment().getAssignmentId(), al);
                     }
                 }
@@ -980,8 +1053,7 @@ public class EoEventService {
         if (!assignmentIds.isEmpty() && disputeRepository != null) {
             List<Dispute> openDisputes = disputeRepository.findByAssignmentIdInAndStatusIn(
                     assignmentIds,
-                    List.of(DisputeStatus.OPEN, DisputeStatus.INVESTIGATING, DisputeStatus.ESCALATED)
-            );
+                    List.of(DisputeStatus.OPEN, DisputeStatus.INVESTIGATING, DisputeStatus.ESCALATED));
             if (openDisputes != null) {
                 for (Dispute d : openDisputes) {
                     if (d != null && d.getAssignmentId() != null) {
@@ -994,10 +1066,12 @@ public class EoEventService {
         Instant now = Instant.now();
         List<EoWorkerReviewItemDto> results = new ArrayList<>(assignments.size());
         for (ShiftAssignment sa : assignments) {
-            if (sa == null || sa.getAssignmentId() == null) continue;
+            if (sa == null || sa.getAssignmentId() == null)
+                continue;
             Shift shift = sa.getShift();
             Event event = shift != null ? shift.getEvent() : null;
-            if (shift == null || event == null || shift.getStatus() == ShiftStatus.CANCELLED || event.getStatus() == EventStatus.CANCELLED) {
+            if (shift == null || event == null || shift.getStatus() == ShiftStatus.CANCELLED
+                    || event.getStatus() == EventStatus.CANCELLED) {
                 continue;
             }
             Worker worker = sa.getWorker();
@@ -1020,7 +1094,8 @@ public class EoEventService {
                 blockReason = "Đang có tranh chấp mở";
             }
 
-            // Chỉ đưa vào danh sách nếu đã hoàn thành/check-out hoặc đã đánh giá hoặc ca đã đến/qua giờ kết thúc
+            // Chỉ đưa vào danh sách nếu đã hoàn thành/check-out hoặc đã đánh giá hoặc ca đã
+            // đến/qua giờ kết thúc
             if (!hasCheckedOut && !alreadyReviewed && !shiftEndedBySchedule) {
                 continue;
             }
@@ -1044,7 +1119,8 @@ public class EoEventService {
                     .workerReliabilityScore(worker != null ? worker.getReliabilityScore() : MAX_RELIABILITY_SCORE)
                     .workerRatingAvg(worker != null ? worker.getRatingAvg() : DEFAULT_RATING)
                     .performedSkillName(performedSkillId != null ? resolveSkillNameById(performedSkillId) : null)
-                    .confirmedPerformedSkillName(confirmedSkillId != null ? resolveSkillNameById(confirmedSkillId) : null)
+                    .confirmedPerformedSkillName(
+                            confirmedSkillId != null ? resolveSkillNameById(confirmedSkillId) : null)
                     .assignmentStatus(sa.getStatus() != null ? sa.getStatus().name() : null)
                     .checkinTime(att != null ? att.getCheckinTime() : null)
                     .checkoutTime(att != null ? att.getCheckoutTime() : null)
@@ -1055,7 +1131,8 @@ public class EoEventService {
                     .rating(existingReview != null ? existingReview.getRating() : null)
                     .criteriaWorkCompletion(existingReview != null ? existingReview.getCriteriaWorkCompletion() : null)
                     .criteriaPunctuality(existingReview != null ? existingReview.getCriteriaPunctuality() : null)
-                    .criteriaProfessionalism(existingReview != null ? existingReview.getCriteriaProfessionalism() : null)
+                    .criteriaProfessionalism(
+                            existingReview != null ? existingReview.getCriteriaProfessionalism() : null)
                     .comment(existingReview != null ? existingReview.getComment() : null)
                     .tags(existingReview != null ? existingReview.getTags() : null)
                     .reviewedAt(existingReview != null ? existingReview.getCreatedAt() : null)
@@ -1066,7 +1143,8 @@ public class EoEventService {
         results.sort(Comparator
                 .comparing(EoWorkerReviewItemDto::isCanReview).reversed()
                 .thenComparing(EoWorkerReviewItemDto::isHasReviewedWorker)
-                .thenComparing(EoWorkerReviewItemDto::getShiftEndTime, Comparator.nullsLast(Comparator.reverseOrder())));
+                .thenComparing(EoWorkerReviewItemDto::getShiftEndTime,
+                        Comparator.nullsLast(Comparator.reverseOrder())));
 
         return results;
     }
@@ -1088,14 +1166,16 @@ public class EoEventService {
     }
 
     /**
-     * Xóa mềm Sự kiện khỏi danh sách của EO (Soft Delete - Chỉ áp dụng cho Bản nháp)
+     * Xóa mềm Sự kiện khỏi danh sách của EO (Soft Delete - Chỉ áp dụng cho Bản
+     * nháp)
      */
     @Transactional
     public void deleteEvent(UUID userId, UUID eventId) {
         EventOrganizer eo = getEoOrThrow(userId);
         Event event = getOwnedEventOrThrow(eventId, eo.getEoId());
         if (event.getStatus() != EventStatus.DRAFT) {
-            throw new BadRequestException("Chỉ được phép xóa sự kiện ở trạng thái Bản nháp (DRAFT). Sự kiện đã xuất bản hoặc đã tạo không thể xóa mà phải thực hiện Hủy kèm lý do.");
+            throw new BadRequestException(
+                    "Chỉ được phép xóa sự kiện ở trạng thái Bản nháp (DRAFT). Sự kiện đã xuất bản hoặc đã tạo không thể xóa mà phải thực hiện Hủy kèm lý do.");
         }
         event.setDeletedAt(Instant.now());
         eventRepository.save(event);
@@ -1111,7 +1191,8 @@ public class EoEventService {
     }
 
     /**
-     * EO xuất bản Sự kiện và tự động kích hoạt Matching Engine cho tất cả các ca (Không cần ví/ký quỹ)
+     * EO xuất bản Sự kiện và tự động kích hoạt Matching Engine cho tất cả các ca
+     * (Không cần ví/ký quỹ)
      */
     @Transactional
     public EventResponseDto publishEvent(UUID userId, UUID eventId) {
@@ -1119,16 +1200,20 @@ public class EoEventService {
         Event event = getOwnedEventOrThrow(eventId, eo.getEoId());
 
         if (event.getEndTime() != null && Instant.now().isAfter(event.getEndTime())) {
-            throw new BadRequestException("Thời gian tổ chức sự kiện đã trôi qua. Vui lòng chỉnh sửa lại thời gian sự kiện trước khi đăng tuyển.");
+            throw new BadRequestException(
+                    "Thời gian tổ chức sự kiện đã trôi qua. Vui lòng chỉnh sửa lại thời gian sự kiện trước khi đăng tuyển.");
         }
 
         List<Shift> shifts = shiftRepository.findByEvent_EventId(eventId);
         if (shifts == null || shifts.isEmpty()) {
-            throw new BadRequestException("Sự kiện chưa có ca làm việc nào. Vui lòng thêm ít nhất 1 ca trước khi đăng tuyển.");
+            throw new BadRequestException(
+                    "Sự kiện chưa có ca làm việc nào. Vui lòng thêm ít nhất 1 ca trước khi đăng tuyển.");
         }
 
-        // BR-08: Chỉ khấu trừ hạn mức Quota từ Gói cước khi sự kiện kích hoạt Matching Engine (MATCHING)
-        // Chế độ Mời người (INVITE) hoàn toàn miễn phí, không tiêu hao Quota gói dịch vụ
+        // BR-08: Chỉ khấu trừ hạn mức Quota từ Gói cước khi sự kiện kích hoạt Matching
+        // Engine (MATCHING)
+        // Chế độ Mời người (INVITE) hoàn toàn miễn phí, không tiêu hao Quota gói dịch
+        // vụ
         if (!isInviteMode(event)) {
             if (event.getMode() == EventMode.MATCHING && subscriptionService != null) {
                 try {
@@ -1137,12 +1222,15 @@ public class EoEventService {
                     // Quota exceeded hoặc chưa mua gói: Chặn không cho bypass xuất bản sự kiện
                     throw e;
                 } catch (Exception e) {
-                    // Chế độ chịu lỗi (Fault-tolerant): Nếu service gói cước gặp sự cố hệ thống, cho phép tiếp tục
+                    // Chế độ chịu lỗi (Fault-tolerant): Nếu service gói cước gặp sự cố hệ thống,
+                    // cho phép tiếp tục
                     log.warn("Cảnh báo sự cố SubscriptionService khi trừ quota sự kiện: {}", e.getMessage());
                 }
             }
         } else {
-            log.info("Sự kiện {} ở chế độ INVITE (Mời trực tiếp): Miễn phí, không tiêu quota gói dịch vụ và không kích hoạt Matching", event.getName());
+            log.info(
+                    "Sự kiện {} ở chế độ INVITE (Mời trực tiếp): Miễn phí, không tiêu quota gói dịch vụ và không kích hoạt Matching",
+                    event.getName());
         }
 
         event.setStatus(EventStatus.ACTIVE);
@@ -1193,7 +1281,8 @@ public class EoEventService {
     }
 
     /**
-     * UC-59: EO kích hoạt điều phối khẩn cấp (Emergency Dispatch) khi ca làm việc thiếu nhân sự
+     * UC-59: EO kích hoạt điều phối khẩn cấp (Emergency Dispatch) khi ca làm việc
+     * thiếu nhân sự
      */
     @Transactional
     public int triggerEmergencyDispatch(UUID userId, UUID shiftId, Double customRadiusKm) {
@@ -1202,7 +1291,8 @@ public class EoEventService {
     }
 
     /**
-     * UC-59: EO kích hoạt điều phối khẩn cấp (Emergency Dispatch) có khóa dòng + trả chi tiết bán kính & ứng viên
+     * UC-59: EO kích hoạt điều phối khẩn cấp (Emergency Dispatch) có khóa dòng +
+     * trả chi tiết bán kính & ứng viên
      */
     @Transactional
     public Map<String, Object> triggerEmergencyDispatchWithDetails(UUID userId, UUID shiftId, Double customRadiusKm) {
@@ -1217,7 +1307,8 @@ public class EoEventService {
         }
 
         ShiftStaffingPolicy policy = getStaffingPolicy();
-        ShiftStaffingPolicy.EmergencyEligibility eligibility = policy.evaluateEmergencyEligibility(shift, Instant.now());
+        ShiftStaffingPolicy.EmergencyEligibility eligibility = policy.evaluateEmergencyEligibility(shift,
+                Instant.now());
         if (!eligibility.canTriggerEmergency()) {
             throw new BadRequestException(eligibility.blockReason());
         }
@@ -1230,18 +1321,23 @@ public class EoEventService {
         log.info("EO {} kích hoạt Emergency Dispatch cho ca {} (radius={}km): Đã gửi {} đề xuất",
                 eo.getEoId(), shiftId, effectiveRadiusKm, dispatched);
 
-        // Ticket EO-011: Đồng bộ thông báo trạng thái điều phối khẩn cấp vào Notification Bell của EO
+        // Ticket EO-011: Đồng bộ thông báo trạng thái điều phối khẩn cấp vào
+        // Notification Bell của EO
         if (notificationService != null && eo.getUser() != null && eo.getUser().getUserId() != null) {
             try {
                 String evName = (shift.getEvent() != null && shift.getEvent().getName() != null)
-                        ? shift.getEvent().getName() : "Sự kiện";
+                        ? shift.getEvent().getName()
+                        : "Sự kiện";
                 String radiusLabel = (effectiveRadiusKm == Math.rint(effectiveRadiusKm))
-                        ? String.valueOf((long) effectiveRadiusKm) : String.valueOf(effectiveRadiusKm);
+                        ? String.valueOf((long) effectiveRadiusKm)
+                        : String.valueOf(effectiveRadiusKm);
                 String notifTitle = "🚨 [ĐIỀU PHỐI KHẨN CẤP] Đã kích hoạt cho ca " + shift.getJobType();
                 String notifBody = dispatched > 0
-                        ? String.format("Đã mở rộng bán kính tìm kiếm %s km cho ca \"%s\" (%s) và gửi %d đề xuất khẩn cấp đến nhân sự phù hợp theo tiêu chí đã cài đặt.",
+                        ? String.format(
+                                "Đã mở rộng bán kính tìm kiếm %s km cho ca \"%s\" (%s) và gửi %d đề xuất khẩn cấp đến nhân sự phù hợp theo tiêu chí đã cài đặt.",
                                 radiusLabel, shift.getJobType(), evName, dispatched)
-                        : String.format("Đã mở rộng bán kính tìm kiếm %s km cho ca \"%s\" (%s). Hệ thống đang tiếp tục quét nhân sự trực tuyến phù hợp.",
+                        : String.format(
+                                "Đã mở rộng bán kính tìm kiếm %s km cho ca \"%s\" (%s). Hệ thống đang tiếp tục quét nhân sự trực tuyến phù hợp.",
                                 radiusLabel, shift.getJobType(), evName);
 
                 notificationService.createAndSend(
@@ -1256,9 +1352,7 @@ public class EoEventService {
                                 "shiftId", shiftId.toString(),
                                 "type", "EMERGENCY_DISPATCH_ACTIVE",
                                 "dispatchedCount", String.valueOf(dispatched),
-                                "radiusKm", radiusLabel
-                        )
-                );
+                                "radiusKm", radiusLabel));
             } catch (Exception ex) {
                 log.warn("Lỗi gửi thông báo kích hoạt Emergency Dispatch cho EO: {}", ex.getMessage());
             }
@@ -1289,24 +1383,25 @@ public class EoEventService {
         shiftRepository.save(shift);
         log.info("EO {} đã tắt chế độ Emergency Dispatch cho ca {}", eo.getEoId(), shiftId);
 
-        // Ticket EO-011: Đồng bộ thông báo tắt Emergency Dispatch vào Notification Bell của EO
+        // Ticket EO-011: Đồng bộ thông báo tắt Emergency Dispatch vào Notification Bell
+        // của EO
         if (notificationService != null && eo.getUser() != null && eo.getUser().getUserId() != null) {
             try {
                 String evName = (shift.getEvent() != null && shift.getEvent().getName() != null)
-                        ? shift.getEvent().getName() : "Sự kiện";
+                        ? shift.getEvent().getName()
+                        : "Sự kiện";
                 notificationService.createAndSend(
                         eo.getUser().getUserId(),
                         "ℹ️ [ĐIỀU PHỐI KHẨN CẤP] Đã tắt chế độ khẩn cấp",
-                        String.format("Chế độ điều phối khẩn cấp cho ca \"%s\" thuộc sự kiện \"%s\" đã được tắt.", shift.getJobType(), evName),
+                        String.format("Chế độ điều phối khẩn cấp cho ca \"%s\" thuộc sự kiện \"%s\" đã được tắt.",
+                                shift.getJobType(), evName),
                         NotificationType.SYSTEM,
                         "SHIFT",
                         shiftId,
                         Map.of(
                                 "eventId", shift.getEvent() != null ? shift.getEvent().getEventId().toString() : "",
                                 "shiftId", shiftId.toString(),
-                                "type", "EMERGENCY_DISPATCH_DISABLED"
-                        )
-                );
+                                "type", "EMERGENCY_DISPATCH_DISABLED"));
             } catch (Exception ex) {
                 log.warn("Lỗi gửi thông báo tắt Emergency Dispatch cho EO: {}", ex.getMessage());
             }
@@ -1321,9 +1416,11 @@ public class EoEventService {
         return eventOrganizerRepository.findByUser_UserId(userId)
                 .orElseGet(() -> {
                     User user = userRepository.findById(userId)
-                            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin User: " + userId));
+                            .orElseThrow(
+                                    () -> new ResourceNotFoundException("Không tìm thấy thông tin User: " + userId));
                     if (user.getRole() != UserRole.EVENT_ORGANIZER) {
-                        throw new BadRequestException("Tài khoản không phải là Nhà tổ chức sự kiện (Chỉ tài khoản Ban tổ chức mới có quyền tạo và quản lý sự kiện)");
+                        throw new BadRequestException(
+                                "Tài khoản không phải là Nhà tổ chức sự kiện (Chỉ tài khoản Ban tổ chức mới có quyền tạo và quản lý sự kiện)");
                     }
                     return eventOrganizerRepository.save(EventOrganizer.builder().user(user).build());
                 });
@@ -1331,12 +1428,14 @@ public class EoEventService {
 
     private Event getOwnedEventOrThrow(UUID eventId, UUID eoId) {
         return eventRepository.findByEventIdAndEventOrganizer_EoId(eventId, eoId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sự kiện ID: " + eventId + " thuộc nhà tổ chức này"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Không tìm thấy sự kiện ID: " + eventId + " thuộc nhà tổ chức này"));
     }
 
     private Event getOwnedEventForUpdateOrThrow(UUID eventId, UUID eoId) {
         return eventRepository.findByEventIdAndEventOrganizer_EoIdForUpdate(eventId, eoId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sự kiện ID: " + eventId + " thuộc nhà tổ chức này"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Không tìm thấy sự kiện ID: " + eventId + " thuộc nhà tổ chức này"));
     }
 
     private Shift getOwnedShiftOrThrow(UUID shiftId, UUID eoId) {
@@ -1372,7 +1471,8 @@ public class EoEventService {
     }
 
     private void validateFutureStartTime(Instant startTime, String errorMessage) {
-        if (startTime == null) return;
+        if (startTime == null)
+            return;
         Instant minAllowed = Instant.now().minus(Duration.ofMinutes(5));
         if (startTime.isBefore(minAllowed)) {
             throw new BadRequestException(errorMessage);
@@ -1380,7 +1480,8 @@ public class EoEventService {
     }
 
     private void validateShiftArrivalTime(Instant startTime, Instant arrivalTime) {
-        if (startTime == null || arrivalTime == null) return;
+        if (startTime == null || arrivalTime == null)
+            return;
         if (arrivalTime.isAfter(startTime)) {
             throw new BadRequestException("Giờ yêu cầu có mặt (Arrival Time) phải trước hoặc bằng giờ bắt đầu ca.");
         }
@@ -1395,16 +1496,19 @@ public class EoEventService {
         }
         if (event != null) {
             if (event.getStartTime() != null && startTime.isBefore(event.getStartTime())) {
-                throw new BadRequestException("Thời gian bắt đầu ca làm việc không được sớm hơn thời gian bắt đầu của sự kiện.");
+                throw new BadRequestException(
+                        "Thời gian bắt đầu ca làm việc không được sớm hơn thời gian bắt đầu của sự kiện.");
             }
             if (event.getEndTime() != null && endTime.isAfter(event.getEndTime())) {
-                throw new BadRequestException("Thời gian kết thúc ca làm việc không được muộn hơn thời gian kết thúc của sự kiện.");
+                throw new BadRequestException(
+                        "Thời gian kết thúc ca làm việc không được muộn hơn thời gian kết thúc của sự kiện.");
             }
         }
     }
 
     private boolean isShiftStartedForEditLock(Shift shift, Instant now) {
-        if (shift == null) return false;
+        if (shift == null)
+            return false;
         Event event = shift.getEvent();
         if (event != null && event.getStatus() == EventStatus.DRAFT) {
             return false;
@@ -1418,8 +1522,10 @@ public class EoEventService {
     }
 
     private boolean isSameMinuteInstant(Instant a, Instant b) {
-        if (a == null && b == null) return true;
-        if (a == null || b == null) return false;
+        if (a == null && b == null)
+            return true;
+        if (a == null || b == null)
+            return false;
         return a.truncatedTo(ChronoUnit.MINUTES).equals(b.truncatedTo(ChronoUnit.MINUTES));
     }
 
@@ -1432,16 +1538,19 @@ public class EoEventService {
             throw new BadRequestException("Tên vị trí công việc không được vượt quá 80 ký tự.");
         }
         if (!trimmed.matches("^[\\p{L}\\p{N}\\s,./()&+-]+$")) {
-            throw new BadRequestException("Tên vị trí chỉ được chứa chữ cái, chữ số, khoảng trắng và các dấu , . - / ( ) & +.");
+            throw new BadRequestException(
+                    "Tên vị trí chỉ được chứa chữ cái, chữ số, khoảng trắng và các dấu , . - / ( ) & +.");
         }
         String lower = trimmed.toLowerCase(Locale.ROOT);
-        Set<String> allowedAcronyms = Set.of("mc", "pg", "pb", "dj", "pr", "it", "av", "led", "vip", "f&b", "fnb", "qc", "qa", "cskh", "ctv", "hr", "pa", "pm");
+        Set<String> allowedAcronyms = Set.of("mc", "pg", "pb", "dj", "pr", "it", "av", "led", "vip", "f&b", "fnb", "qc",
+                "qa", "cskh", "ctv", "hr", "pa", "pm");
         String[] tokens = lower.split("[\\s,./()&+-]+");
         boolean hasValidLetterToken = false;
         String vowelRegex = ".*[aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ].*";
 
         if (trimmed.length() < 3 && !allowedAcronyms.contains(lower)) {
-            throw new BadRequestException("Tên vị trí quá ngắn (tối thiểu 3 ký tự, trừ viết tắt hợp lệ như MC, PG, DJ).");
+            throw new BadRequestException(
+                    "Tên vị trí quá ngắn (tối thiểu 3 ký tự, trừ viết tắt hợp lệ như MC, PG, DJ).");
         }
         if (trimmed.matches(".*(.)\\1{3,}.*")) {
             throw new BadRequestException("Tên vị trí chứa ký tự lặp bất thường.");
@@ -1450,8 +1559,10 @@ public class EoEventService {
             throw new BadRequestException("Tên vị trí không hợp lệ hoặc chứa chuỗi ký tự vô nghĩa.");
         }
         for (String token : tokens) {
-            if (token.isEmpty()) continue;
-            if (token.matches("^\\d+$")) continue;
+            if (token.isEmpty())
+                continue;
+            if (token.matches("^\\d+$"))
+                continue;
             if (allowedAcronyms.contains(token)) {
                 hasValidLetterToken = true;
                 continue;
@@ -1465,43 +1576,22 @@ public class EoEventService {
             }
         }
         if (!hasValidLetterToken) {
-            throw new BadRequestException("Tên vị trí phải chứa từ khóa mô tả công việc hợp lệ (không thể chỉ nhập số).");
+            throw new BadRequestException(
+                    "Tên vị trí phải chứa từ khóa mô tả công việc hợp lệ (không thể chỉ nhập số).");
         }
     }
 
+    private static final GeoWageRegionResolver FALLBACK_REGION_RESOLVER = new GeoWageRegionResolver();
+
     public static City resolveEventCity(Event event) {
-        if (event == null) return City.TP_HCM;
+        if (event == null)
+            return City.TP_HCM;
         return resolveCityFromLocation(event.getVenueAddress(), event.getVenueLat(), event.getVenueLng());
     }
 
     public static City resolveCityFromLocation(String address, Double lat, Double lng) {
-        if (lat != null && lng != null && (lat != 0 || lng != 0)) {
-            if (lat >= 20.5 && lat <= 21.45 && lng >= 105.2 && lng <= 106.1) {
-                return City.HANOI;
-            }
-            if (lat >= 15.8 && lat <= 16.35 && lng >= 107.8 && lng <= 108.4) {
-                return City.DANANG;
-            }
-            if (lat >= 10.3 && lat <= 11.2 && lng >= 106.3 && lng <= 107.15) {
-                return City.TP_HCM;
-            }
-        }
-        if (address != null && !address.isBlank()) {
-            String lower = address.toLowerCase(Locale.ROOT);
-            if (lower.contains("đà nẵng") || lower.contains("da nang") || lower.contains("danang")
-                    || lower.contains("hải châu") || lower.contains("ngũ hành sơn") || lower.contains("sơn trà")
-                    || lower.contains("thanh khê") || lower.contains("liên chiểu") || lower.contains("cẩm lệ")) {
-                return City.DANANG;
-            }
-            if (lower.contains("hà nội") || lower.contains("ha noi") || lower.contains("hanoi")
-                    || lower.contains("ba đình") || lower.contains("cầu giấy") || lower.contains("hoàn kiếm")
-                    || lower.contains("đống đa") || lower.contains("tây hồ") || lower.contains("hai bà trưng")
-                    || lower.contains("nam từ liêm") || lower.contains("bắc từ liêm") || lower.contains("thanh xuân")
-                    || lower.contains("hà đông") || lower.contains("long biên") || lower.contains("hoàng mai")) {
-                return City.HANOI;
-            }
-        }
-        return City.TP_HCM;
+        GeoWageRegionResolver.ResolvedRegion resolved = FALLBACK_REGION_RESOLVER.resolve(null, null, address, lat, lng);
+        return resolved.legacyCity() != null ? resolved.legacyCity() : City.TP_HCM;
     }
 
     public static BigDecimal resolveLegalFloorWage(City city) {
@@ -1525,18 +1615,30 @@ public class EoEventService {
         if (hourlyWage == null || hourlyWage.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BadRequestException("Mức thù lao theo giờ phải lớn hơn 0");
         }
-        City city = resolveEventCity(event);
-        BigDecimal legalFloor = resolveLegalFloorWage(city);
+        GeoWageRegionResolver resolver = geoWageRegionResolver != null ? geoWageRegionResolver
+                : FALLBACK_REGION_RESOLVER;
+        GeoWageRegionResolver.ResolvedRegion resolved = resolver.resolve(
+                null,
+                null,
+                event != null ? event.getVenueAddress() : null,
+                event != null ? event.getVenueLat() : null,
+                event != null ? event.getVenueLng() : null);
+        BigDecimal legalFloor = resolved.regionCode().getDefaultStatutoryFloor();
+        if (wageRegionRepository != null) {
+            legalFloor = wageRegionRepository.findById(resolved.regionCode())
+                    .map(WageRegion::getLegalFloorHourly)
+                    .orElse(legalFloor);
+        }
         if (hourlyWage.compareTo(legalFloor) < 0) {
-            String regionLabel = resolveLegalRegionLabel(city);
-            String formattedFloor = legalFloor.compareTo(REGION_2_STATUTORY_FLOOR) == 0 ? "22.700" : "25.500";
+            String formattedFloor = String.format(Locale.US, "%,d", legalFloor.longValue()).replace(',', '.');
             throw new BadRequestException(String.format(
                     "Mức thù lao không được thấp hơn mức tối thiểu quy định của %s: %s VNĐ/giờ (theo Nghị định 293/2025/NĐ-CP)",
-                    regionLabel, formattedFloor));
+                    resolved.regionLabel(), formattedFloor));
         }
     }
 
-    private BigDecimal calculateShiftTotalCost(Instant startTime, Instant endTime, BigDecimal hourlyWage, int requiredWorkers, BigDecimal allowance) {
+    private BigDecimal calculateShiftTotalCost(Instant startTime, Instant endTime, BigDecimal hourlyWage,
+            int requiredWorkers, BigDecimal allowance) {
         long minutes = Duration.between(startTime, endTime).toMinutes();
         double hours = Math.max(MIN_BILLABLE_HOURS, minutes / 60.0);
         return hourlyWage.multiply(BigDecimal.valueOf(hours))
@@ -1546,9 +1648,11 @@ public class EoEventService {
     }
 
     private BigDecimal calculateSingleWorkerAgreedWage(Shift shift) {
-        if (shift == null) return BigDecimal.ZERO;
+        if (shift == null)
+            return BigDecimal.ZERO;
         long minutes = (shift.getStartTime() != null && shift.getEndTime() != null)
-                ? Duration.between(shift.getStartTime(), shift.getEndTime()).toMinutes() : DEFAULT_SHIFT_MINUTES;
+                ? Duration.between(shift.getStartTime(), shift.getEndTime()).toMinutes()
+                : DEFAULT_SHIFT_MINUTES;
         double hours = Math.max(MIN_BILLABLE_HOURS, minutes / 60.0);
         BigDecimal hourly = shift.getHourlyWage() != null ? shift.getHourlyWage() : DEFAULT_HOURLY_WAGE;
         BigDecimal allowance = shift.getAllowance() != null ? shift.getAllowance() : BigDecimal.ZERO;
@@ -1674,7 +1778,8 @@ public class EoEventService {
         }
     }
 
-    private void cancelActiveAssignmentsForShift(UUID shiftId, UUID cancelledBy, String reason, String cancellationType) {
+    private void cancelActiveAssignmentsForShift(UUID shiftId, UUID cancelledBy, String reason,
+            String cancellationType) {
         List<ShiftAssignment> assignments = shiftAssignmentRepository.findByShift_ShiftId(shiftId);
         Instant now = Instant.now();
         for (ShiftAssignment sa : assignments) {
@@ -1698,7 +1803,8 @@ public class EoEventService {
         worker.setRatingAvg(newAvg);
         worker.setRatingCount(count);
 
-        int currentReliability = worker.getReliabilityScore() != null ? worker.getReliabilityScore() : MAX_RELIABILITY_SCORE;
+        int currentReliability = worker.getReliabilityScore() != null ? worker.getReliabilityScore()
+                : MAX_RELIABILITY_SCORE;
         if (newRating >= 4 && currentReliability < MAX_RELIABILITY_SCORE) {
             worker.setReliabilityScore(Math.min(MAX_RELIABILITY_SCORE, currentReliability + 1));
         } else if (newRating <= 2 && currentReliability > MIN_RELIABILITY_SCORE) {
@@ -1710,8 +1816,7 @@ public class EoEventService {
     public List<ShiftAttendanceDto> mapAssignmentsToAttendanceDtos(
             List<ShiftAssignment> assignments,
             Map<UUID, Shift> shiftsById,
-            UUID eoUserId
-    ) {
+            UUID eoUserId) {
         if (assignments == null || assignments.isEmpty()) {
             return Collections.emptyList();
         }
@@ -1733,7 +1838,8 @@ public class EoEventService {
             if (batchLogs != null && (!batchLogs.isEmpty() || assignments.size() > 1)) {
                 hasBatchAttendance = true;
                 for (AttendanceLog att : batchLogs) {
-                    if (att != null && att.getShiftAssignment() != null && att.getShiftAssignment().getAssignmentId() != null) {
+                    if (att != null && att.getShiftAssignment() != null
+                            && att.getShiftAssignment().getAssignmentId() != null) {
                         attendanceByAssignmentId.putIfAbsent(att.getShiftAssignment().getAssignmentId(), att);
                     }
                 }
@@ -1784,8 +1890,8 @@ public class EoEventService {
         Map<UUID, WorkerEkycVerification> latestAnyEkycByWorkerId = new HashMap<>();
         boolean hasBatchEkyc = false;
         if (!workerIds.isEmpty() && workerEkycVerificationRepository != null) {
-            List<WorkerEkycVerification> batchEkycs =
-                    workerEkycVerificationRepository.findByWorker_WorkerIdInOrderByCreatedAtDesc(workerIds);
+            List<WorkerEkycVerification> batchEkycs = workerEkycVerificationRepository
+                    .findByWorker_WorkerIdInOrderByCreatedAtDesc(workerIds);
             if (batchEkycs != null && (!batchEkycs.isEmpty() || assignments.size() > 1)) {
                 hasBatchEkyc = true;
                 for (WorkerEkycVerification v : batchEkycs) {
@@ -1802,8 +1908,8 @@ public class EoEventService {
 
         Integer preloadedMinRegAge = latestAnyEkycByWorkerId.values().stream()
                 .anyMatch(v -> v != null && v.getMeetsMinimumAge() == null && v.getDob() != null)
-                ? EkycConsentAndAgeHelper.resolveMinRegistrationAge(systemConfigRepository)
-                : null;
+                        ? EkycConsentAndAgeHelper.resolveMinRegistrationAge(systemConfigRepository)
+                        : null;
 
         // 5. Batch Skill Names & Precomputed Shift wages
         Set<UUID> skillIds = new LinkedHashSet<>();
@@ -1819,7 +1925,8 @@ public class EoEventService {
             }
         }
         for (ShiftAssignment sa : assignments) {
-            if (sa == null) continue;
+            if (sa == null)
+                continue;
             if (sa.getConfirmedPerformedSkillId() != null) {
                 skillIds.add(sa.getConfirmedPerformedSkillId());
             }
@@ -1847,7 +1954,8 @@ public class EoEventService {
 
         List<ShiftAttendanceDto> results = new ArrayList<>(assignments.size());
         for (ShiftAssignment sa : assignments) {
-            if (sa == null) continue;
+            if (sa == null)
+                continue;
             Shift shift = sa.getShift();
             if (shift != null && shift.getShiftId() != null && safeShiftsById.containsKey(shift.getShiftId())) {
                 shift = safeShiftsById.get(shift.getShiftId());
@@ -1855,14 +1963,17 @@ public class EoEventService {
                 shift = safeShiftsById.values().iterator().next();
             }
 
-            BigDecimal agreedWage = (shift != null && shift.getShiftId() != null && wageByShiftId.containsKey(shift.getShiftId()))
-                    ? wageByShiftId.get(shift.getShiftId())
-                    : calculateSingleWorkerAgreedWage(shift);
-            String checklistSummary = computeChecklistSummary(shift != null ? shift.getChecklist() : null, sa.getChecklistProgress());
+            BigDecimal agreedWage = (shift != null && shift.getShiftId() != null
+                    && wageByShiftId.containsKey(shift.getShiftId()))
+                            ? wageByShiftId.get(shift.getShiftId())
+                            : calculateSingleWorkerAgreedWage(shift);
+            String checklistSummary = computeChecklistSummary(shift != null ? shift.getChecklist() : null,
+                    sa.getChecklistProgress());
 
             Optional<AttendanceLog> attOpt;
             if (hasBatchAttendance) {
-                attOpt = Optional.ofNullable(sa.getAssignmentId() != null ? attendanceByAssignmentId.get(sa.getAssignmentId()) : null);
+                attOpt = Optional.ofNullable(
+                        sa.getAssignmentId() != null ? attendanceByAssignmentId.get(sa.getAssignmentId()) : null);
             } else {
                 attOpt = (sa.getAssignmentId() != null && attendanceLogRepository != null)
                         ? attendanceLogRepository.findByShiftAssignment_AssignmentId(sa.getAssignmentId())
@@ -1871,7 +1982,8 @@ public class EoEventService {
 
             Optional<Payment> payOpt;
             if (hasBatchPayments) {
-                payOpt = Optional.ofNullable(sa.getAssignmentId() != null ? paymentByAssignmentId.get(sa.getAssignmentId()) : null);
+                payOpt = Optional.ofNullable(
+                        sa.getAssignmentId() != null ? paymentByAssignmentId.get(sa.getAssignmentId()) : null);
             } else {
                 payOpt = (sa.getAssignmentId() != null && paymentRepository != null)
                         ? paymentRepository.findByAssignmentId(sa.getAssignmentId())
@@ -1892,13 +2004,14 @@ public class EoEventService {
                 if (hasBatchEkyc) {
                     WorkerEkycVerification v = latestApprovedEkycByWorkerId.getOrDefault(
                             worker.getWorkerId(),
-                            latestAnyEkycByWorkerId.get(worker.getWorkerId())
-                    );
+                            latestAnyEkycByWorkerId.get(worker.getWorkerId()));
                     ekycOpt = Optional.ofNullable(v);
                 } else if (workerEkycVerificationRepository != null) {
                     ekycOpt = workerEkycVerificationRepository
-                            .findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(worker.getWorkerId(), List.of("APPROVED"))
-                            .or(() -> workerEkycVerificationRepository.findTopByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId()));
+                            .findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(worker.getWorkerId(),
+                                    List.of("APPROVED"))
+                            .or(() -> workerEkycVerificationRepository
+                                    .findTopByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId()));
                 }
             }
 
@@ -1912,8 +2025,7 @@ public class EoEventService {
                     reviewed,
                     ekycOpt,
                     skillNamesById,
-                    preloadedMinRegAge
-            );
+                    preloadedMinRegAge);
             if (shift != null) {
                 dto.setShiftId(shift.getShiftId());
                 dto.setJobType(shift.getJobType());
@@ -1924,7 +2036,8 @@ public class EoEventService {
         return results;
     }
 
-    private ShiftAttendanceDto mapToShiftAttendanceDto(ShiftAssignment sa, UUID eoUserId, BigDecimal agreedWage, String checklistSummary) {
+    private ShiftAttendanceDto mapToShiftAttendanceDto(ShiftAssignment sa, UUID eoUserId, BigDecimal agreedWage,
+            String checklistSummary) {
         Worker worker = sa.getWorker();
         Shift shift = sa.getShift();
 
@@ -1941,7 +2054,8 @@ public class EoEventService {
         if (worker != null && worker.getWorkerId() != null && workerEkycVerificationRepository != null) {
             ekycOpt = workerEkycVerificationRepository
                     .findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(worker.getWorkerId(), List.of("APPROVED"))
-                    .or(() -> workerEkycVerificationRepository.findTopByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId()));
+                    .or(() -> workerEkycVerificationRepository
+                            .findTopByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId()));
         }
 
         return buildShiftAttendanceDto(
@@ -1953,8 +2067,7 @@ public class EoEventService {
                 payOpt,
                 reviewed,
                 ekycOpt,
-                Collections.emptyMap()
-        );
+                Collections.emptyMap());
     }
 
     private ShiftAttendanceDto buildShiftAttendanceDto(
@@ -1966,12 +2079,10 @@ public class EoEventService {
             Optional<Payment> payOpt,
             boolean reviewed,
             Optional<WorkerEkycVerification> ekycOpt,
-            Map<UUID, String> preloadedSkillNames
-    ) {
+            Map<UUID, String> preloadedSkillNames) {
         return buildShiftAttendanceDto(
                 sa, shift, agreedWage, checklistSummary, attOpt, payOpt,
-                reviewed, ekycOpt, preloadedSkillNames, null
-        );
+                reviewed, ekycOpt, preloadedSkillNames, null);
     }
 
     private ShiftAttendanceDto buildShiftAttendanceDto(
@@ -1984,13 +2095,15 @@ public class EoEventService {
             boolean reviewed,
             Optional<WorkerEkycVerification> ekycOpt,
             Map<UUID, String> preloadedSkillNames,
-            Integer preloadedMinRegAge
-    ) {
+            Integer preloadedMinRegAge) {
         Worker worker = sa.getWorker();
         User u = worker != null ? worker.getUser() : null;
-        boolean checklistDone = isChecklistFullyCompleted(shift != null ? shift.getChecklist() : null, sa.getChecklistProgress());
+        boolean checklistDone = isChecklistFullyCompleted(shift != null ? shift.getChecklist() : null,
+                sa.getChecklistProgress());
 
-        String defaultName = "Worker #" + (worker != null && worker.getWorkerId() != null ? worker.getWorkerId().toString().substring(0, 8) : "");
+        String defaultName = "Worker #"
+                + (worker != null && worker.getWorkerId() != null ? worker.getWorkerId().toString().substring(0, 8)
+                        : "");
 
         Integer workerAge = null;
         Boolean meetsMinimumAge = null;
@@ -2076,7 +2189,8 @@ public class EoEventService {
                 .yearsExperience(worker != null ? worker.getYearsExperience() : 0)
                 .bankCode(bankCode)
                 .bankAccountNumber(bankAccountNumber)
-                .bankAccountNumberMasked(worker != null ? worker.getBankAccountNumberMasked() : com.cani.security.crypto.AesGcmCryptoUtil.mask(bankAccountNumber))
+                .bankAccountNumberMasked(worker != null ? worker.getBankAccountNumberMasked()
+                        : com.cani.security.crypto.AesGcmCryptoUtil.mask(bankAccountNumber))
                 .bankAccountName(bankAccountName)
                 .vietQrUrl(vietQrUrl)
                 .source(sa.getSource())
@@ -2155,7 +2269,8 @@ public class EoEventService {
             }
             String savedFilename = "event_" + UUID.randomUUID().toString().replace("-", "") + "." + ext;
             java.nio.file.Path targetPath = uploadPath.resolve(savedFilename);
-            java.nio.file.Files.copy(file.getInputStream(), targetPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            java.nio.file.Files.copy(file.getInputStream(), targetPath,
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             return "/api/v1/eo/events/images/" + savedFilename;
         } catch (java.io.IOException e) {
             log.error("Lỗi khi lưu tệp ảnh sự kiện: {}", e.getMessage(), e);
@@ -2169,7 +2284,8 @@ public class EoEventService {
                 throw new BadRequestException("Tên tệp không hợp lệ");
             }
             java.nio.file.Path filePath = java.nio.file.Paths.get(EVENT_UPLOAD_DIR).resolve(filename).normalize();
-            org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(filePath.toUri());
+            org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(
+                    filePath.toUri());
             if (resource.exists() && resource.isReadable()) {
                 return resource;
             } else {
@@ -2188,8 +2304,7 @@ public class EoEventService {
             UUID performedSkillId,
             UUID[] legacyRequiredSkills,
             List<ShiftSkillRequirementDto> structuredReqs,
-            String customSkillNotes
-    ) {
+            String customSkillNotes) {
         if (performedSkillId != null) {
             validateAndResolveActiveSkill(performedSkillId, "Kỹ năng thực hiện chính");
         }
@@ -2214,13 +2329,15 @@ public class EoEventService {
                     entriesBySkillId.put(item.getSkillId(), new PreparedRequirementEntry(
                             item.getSkillId(), resolvedSkill, reqType, minTier, reqCert));
                 } else {
-                    // Nếu trùng skillId: REQUIRED ưu tiên hơn PREFERRED, mức xác minh cao hơn được giữ lại
+                    // Nếu trùng skillId: REQUIRED ưu tiên hơn PREFERRED, mức xác minh cao hơn được
+                    // giữ lại
                     SkillRequirementType mergedType = (existing.requirementType() == SkillRequirementType.REQUIRED
                             || reqType == SkillRequirementType.REQUIRED)
-                            ? SkillRequirementType.REQUIRED
-                            : SkillRequirementType.PREFERRED;
+                                    ? SkillRequirementType.REQUIRED
+                                    : SkillRequirementType.PREFERRED;
                     VerificationTier mergedTier = tierRank(minTier) > tierRank(existing.minVerificationTier())
-                            ? minTier : existing.minVerificationTier();
+                            ? minTier
+                            : existing.minVerificationTier();
                     boolean mergedCert = existing.requiresValidCertificate() || reqCert;
                     entriesBySkillId.put(item.getSkillId(), new PreparedRequirementEntry(
                             item.getSkillId(),
@@ -2260,7 +2377,8 @@ public class EoEventService {
                 ? customSkillNotes.trim()
                 : null;
 
-        return new PreparedShiftSkillConfig(performedSkillId, requiredArray, new ArrayList<>(entriesBySkillId.values()), trimmedNotes);
+        return new PreparedShiftSkillConfig(performedSkillId, requiredArray, new ArrayList<>(entriesBySkillId.values()),
+                trimmedNotes);
     }
 
     private void persistShiftSkillRequirements(Shift shift, PreparedShiftSkillConfig config, boolean clearExisting) {
@@ -2300,9 +2418,11 @@ public class EoEventService {
             return null;
         }
         Skill sk = skillRepository.findById(skillId)
-                .orElseThrow(() -> new BadRequestException(label + " không tồn tại trong hệ thống (ID: " + skillId + ")."));
+                .orElseThrow(
+                        () -> new BadRequestException(label + " không tồn tại trong hệ thống (ID: " + skillId + ")."));
         if (Boolean.FALSE.equals(sk.getIsActive())) {
-            throw new BadRequestException(label + " \"" + sk.getName() + "\" hiện chưa được kích hoạt trong danh mục chuẩn.");
+            throw new BadRequestException(
+                    label + " \"" + sk.getName() + "\" hiện chưa được kích hoạt trong danh mục chuẩn.");
         }
         return sk;
     }
@@ -2315,7 +2435,8 @@ public class EoEventService {
     }
 
     private int tierRank(VerificationTier tier) {
-        if (tier == null) return 0;
+        if (tier == null)
+            return 0;
         return switch (tier) {
             case SELF_DECLARED -> 0;
             case AI_DOCUMENT -> 1;
@@ -2328,30 +2449,32 @@ public class EoEventService {
             Skill skill,
             SkillRequirementType requirementType,
             VerificationTier minVerificationTier,
-            boolean requiresValidCertificate
-    ) {
+            boolean requiresValidCertificate) {
     }
 
     private record PreparedShiftSkillConfig(
             UUID performedSkillId,
             UUID[] requiredSkillIdsArray,
             List<PreparedRequirementEntry> entries,
-            String customSkillNotes
-    ) {
+            String customSkillNotes) {
     }
 
     public static boolean isGibberishOrSpam(String input) {
-        if (input == null) return false;
+        if (input == null)
+            return false;
         String str = input.trim().toLowerCase();
-        if (str.length() < 3) return false;
+        if (str.length() < 3)
+            return false;
 
         // 1. Ký tự đơn lặp lại liên tiếp >= 4 lần (ví dụ: aaaaa, 11111)
         java.util.regex.Pattern singleCharRep = java.util.regex.Pattern.compile("(.)\\1{3,}");
-        if (singleCharRep.matcher(str).find()) return true;
+        if (singleCharRep.matcher(str).find())
+            return true;
 
         // 2. Cặp ký tự lặp lại >= 3 lần (ví dụ: ababab, cdcdcd)
         java.util.regex.Pattern pairCharRep = java.util.regex.Pattern.compile("(.{2})\\1{2,}");
-        if (pairCharRep.matcher(str).find()) return true;
+        if (pairCharRep.matcher(str).find())
+            return true;
 
         // Tách các từ theo khoảng trắng
         String[] words = str.split("\\s+");
@@ -2362,7 +2485,8 @@ public class EoEventService {
         for (String w : words) {
             if (!w.isBlank() && w.equals(consecutiveWord)) {
                 consecutiveCount++;
-                if (consecutiveCount >= 3) return true;
+                if (consecutiveCount >= 3)
+                    return true;
             } else {
                 consecutiveWord = w;
                 consecutiveCount = 1;
@@ -2372,13 +2496,13 @@ public class EoEventService {
         // 4. Các mẫu cào phím (Keyboard mash) phổ biến (Telex / Qwerty home-row)
         java.util.regex.Pattern mashPattern = java.util.regex.Pattern.compile(
                 "(asdasd|sdasd|ádasd|sdada|adasd|sdfsdf|dfghj|fghjk|ghjkl|qwerty|zxcvb)",
-                java.util.regex.Pattern.CASE_INSENSITIVE
-        );
+                java.util.regex.Pattern.CASE_INSENSITIVE);
         if (mashPattern.matcher(str).find()) {
             return true;
         }
 
-        // 5. Kiểm tra tần suất từ chiếm ưu thế bất thường (ví dụ: "ádas ád ád ád ádasd ád")
+        // 5. Kiểm tra tần suất từ chiếm ưu thế bất thường (ví dụ: "ádas ád ád ád ádasd
+        // ád")
         if (words.length >= 4) {
             java.util.Map<String, Integer> wordCounts = new java.util.HashMap<>();
             int maxCount = 0;
@@ -2386,7 +2510,8 @@ public class EoEventService {
                 if (!w.isBlank()) {
                     int c = wordCounts.getOrDefault(w, 0) + 1;
                     wordCounts.put(w, c);
-                    if (c > maxCount) maxCount = c;
+                    if (c > maxCount)
+                        maxCount = c;
                 }
             }
             if ((double) maxCount / words.length >= 0.45) {
@@ -2395,7 +2520,8 @@ public class EoEventService {
         }
 
         // 6. Độ đa dạng ký tự (Character Diversity / Entropy) trên văn bản chữ cái
-        String cleanLetters = str.replaceAll("[^a-zàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ]", "");
+        String cleanLetters = str
+                .replaceAll("[^a-zàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ]", "");
         if (cleanLetters.length() >= 10) {
             long uniqueChars = cleanLetters.chars().distinct().count();
             if (cleanLetters.length() <= 30) {
@@ -2413,7 +2539,8 @@ public class EoEventService {
         // 7. Regex nhận diện nguyên âm tiếng Việt và tiếng Anh
         String vowelsPattern = ".*[aeiouyáàảãạăằắẳẵặâầấẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơờớởỡợúùúủũụưứừửữựýỳỷỹỵ].*";
 
-        // Nếu một từ chữ cái có độ dài >= 4 ký tự nhưng hoàn toàn KHÔNG chứa nguyên âm (bỏ qua số, dấu phân cách)
+        // Nếu một từ chữ cái có độ dài >= 4 ký tự nhưng hoàn toàn KHÔNG chứa nguyên âm
+        // (bỏ qua số, dấu phân cách)
         for (String w : words) {
             String lettersOnly = w.replaceAll("[^\\p{L}]", "");
             if (lettersOnly.length() >= 4 && !lettersOnly.matches(vowelsPattern)) {
@@ -2421,11 +2548,11 @@ public class EoEventService {
             }
         }
 
-        // 8. Chuỗi phụ âm liên tiếp >= 5 ký tự không ngắt quãng (như sdfdsfsdfsd, asdfgh)
+        // 8. Chuỗi phụ âm liên tiếp >= 5 ký tự không ngắt quãng (như sdfdsfsdfsd,
+        // asdfgh)
         java.util.regex.Pattern consonantRun = java.util.regex.Pattern.compile(
                 "[^aeiouyáàảãạăằắẳẵặâầấẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùúủũụưứừửữựýỳýỷỹỵ\\s\\d,\\.\\-_/()]{5,}",
-                java.util.regex.Pattern.CASE_INSENSITIVE
-        );
+                java.util.regex.Pattern.CASE_INSENSITIVE);
         if (consonantRun.matcher(str).find()) {
             return true;
         }
@@ -2439,7 +2566,8 @@ public class EoEventService {
         return false;
     }
 
-    private void validateEventDetails(String name, String description, String venueAddress, Instant startTime, Instant endTime) {
+    private void validateEventDetails(String name, String description, String venueAddress, Instant startTime,
+            Instant endTime) {
         if (name != null) {
             String trimmedName = name.trim();
             if (trimmedName.length() < 6) {
@@ -2469,7 +2597,8 @@ public class EoEventService {
     }
 
     private String normalizeJobTypeForDupCheck(String jobType) {
-        if (jobType == null) return "";
+        if (jobType == null)
+            return "";
         return jobType.trim().replaceAll("\\s+", " ").toLowerCase(java.util.Locale.ROOT);
     }
 
@@ -2480,10 +2609,11 @@ public class EoEventService {
         return startA.truncatedTo(java.time.temporal.ChronoUnit.MINUTES)
                 .equals(startB.truncatedTo(java.time.temporal.ChronoUnit.MINUTES))
                 && endA.truncatedTo(java.time.temporal.ChronoUnit.MINUTES)
-                .equals(endB.truncatedTo(java.time.temporal.ChronoUnit.MINUTES));
+                        .equals(endB.truncatedTo(java.time.temporal.ChronoUnit.MINUTES));
     }
 
-    private void validateNoDuplicateShift(UUID eventId, String jobType, Instant startTime, Instant endTime, UUID excludeShiftId) {
+    private void validateNoDuplicateShift(UUID eventId, String jobType, Instant startTime, Instant endTime,
+            UUID excludeShiftId) {
         if (eventId == null || shiftRepository == null || startTime == null || endTime == null) {
             return;
         }
@@ -2496,9 +2626,12 @@ public class EoEventService {
             return;
         }
         for (Shift existing : existingShifts) {
-            if (existing == null) continue;
-            if (excludeShiftId != null && excludeShiftId.equals(existing.getShiftId())) continue;
-            if (existing.getStatus() == ShiftStatus.CANCELLED) continue;
+            if (existing == null)
+                continue;
+            if (excludeShiftId != null && excludeShiftId.equals(existing.getShiftId()))
+                continue;
+            if (existing.getStatus() == ShiftStatus.CANCELLED)
+                continue;
             if (normalizeJobTypeForDupCheck(existing.getJobType()).equals(normalizedCandidate)
                     && isSameMinuteSlot(existing.getStartTime(), existing.getEndTime(), startTime, endTime)) {
                 throw new BadRequestException("Đã tồn tại ca làm việc vị trí \"" + jobType.trim()

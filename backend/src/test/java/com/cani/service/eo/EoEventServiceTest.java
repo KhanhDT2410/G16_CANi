@@ -969,6 +969,66 @@ class EoEventServiceTest {
     }
 
     @Test
+    @DisplayName("UTC023h - addShiftToEvent() - Normal: Cho phép mức thù lao 20.500 VNĐ/giờ tại Cà Mau (Vùng III: sàn tối thiểu 20.000 VNĐ/giờ)")
+    void addShiftToEvent_Success_AllowsRegion3HourlyWageAbove20k() {
+        UUID eventId = UUID.randomUUID();
+        Event mockRegion3Event = Event.builder()
+                .eventId(eventId)
+                .eventOrganizer(mockEo)
+                .status(EventStatus.DRAFT)
+                .venueAddress("Quảng trường Hùng Vương, TP. Cà Mau")
+                .build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(eventRepository.findByEventIdAndEventOrganizer_EoIdForUpdate(eventId, eoId)).thenReturn(Optional.of(mockRegion3Event));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(i -> {
+            Shift s = i.getArgument(0);
+            s.setShiftId(UUID.randomUUID());
+            return s;
+        });
+
+        Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
+        CreateShiftRequestDto shiftDto = CreateShiftRequestDto.builder()
+                .jobType("Phục vụ")
+                .startTime(start)
+                .endTime(start.plus(3, ChronoUnit.HOURS))
+                .requiredWorkers(2)
+                .hourlyWage(BigDecimal.valueOf(20500))
+                .build();
+
+        ShiftResponseDto result = eoEventService.addShiftToEvent(userId, eventId, shiftDto);
+        assertNotNull(result);
+        assertEquals(0, BigDecimal.valueOf(20500).compareTo(result.getHourlyWage()));
+    }
+
+    @Test
+    @DisplayName("UTC023i - addShiftToEvent() - Abnormal: Chặn lưu khi mức thù lao tại Hà Giang thấp hơn sàn Vùng IV (17.800 VNĐ/giờ)")
+    void addShiftToEvent_ThrowsBadRequest_WhenRegion4HourlyWageBelow17800() {
+        UUID eventId = UUID.randomUUID();
+        Event mockRegion4Event = Event.builder()
+                .eventId(eventId)
+                .eventOrganizer(mockEo)
+                .status(EventStatus.DRAFT)
+                .venueAddress("TP. Hà Giang, Hà Giang")
+                .build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(eventRepository.findByEventIdAndEventOrganizer_EoIdForUpdate(eventId, eoId)).thenReturn(Optional.of(mockRegion4Event));
+
+        Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
+        CreateShiftRequestDto shiftDto = CreateShiftRequestDto.builder()
+                .jobType("Phục vụ")
+                .startTime(start)
+                .endTime(start.plus(3, ChronoUnit.HOURS))
+                .requiredWorkers(2)
+                .hourlyWage(BigDecimal.valueOf(17000))
+                .build();
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.addShiftToEvent(userId, eventId, shiftDto));
+        assertEquals("Mức thù lao không được thấp hơn mức tối thiểu quy định của Vùng IV: 17.800 VNĐ/giờ (theo Nghị định 293/2025/NĐ-CP)", ex.getMessage());
+    }
+
+    @Test
     @DisplayName("UTC023d - addShiftToEvent() - Abnormal (EO-005): Khóa sự kiện & chặn nhân bản Shift trùng vị trí cùng khung giờ")
     void addShiftToEvent_ThrowsBadRequest_WhenDuplicateShiftAlreadyExists() {
         UUID eventId = UUID.randomUUID();

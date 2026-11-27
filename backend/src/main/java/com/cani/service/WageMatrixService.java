@@ -1,15 +1,18 @@
 package com.cani.service;
 
 import com.cani.dto.response.PageResponse;
+import com.cani.dto.wage.UpdateWageRegionRequestDto;
 import com.cani.dto.wage.WageMatrixRequestDto;
 import com.cani.dto.wage.WageMatrixResponseDto;
+import com.cani.dto.wage.WageRegionDto;
 import com.cani.entity.WageMatrix;
-import com.cani.entity.enums.City;
-import com.cani.entity.enums.LeadTime;
-import com.cani.entity.enums.TimeSlot;
+import com.cani.entity.WageRegion;
+import com.cani.entity.enums.JobTier;
+import com.cani.entity.enums.WageRegionCode;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.WageMatrixRepository;
+import com.cani.repository.WageRegionRepository;
 import jakarta.persistence.criteria.Predicate;
 import lombok.Builder;
 import lombok.Data;
@@ -24,9 +27,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -34,32 +41,78 @@ import java.util.UUID;
 public class WageMatrixService {
 
     private final WageMatrixRepository wageMatrixRepository;
-
-    private static final BigDecimal DEFAULT_FALLBACK_WAGE = new BigDecimal("35000.00");
+    private final WageRegionRepository wageRegionRepository;
 
     @Data
     @Builder
-    public static class LookupResult {
-        private BigDecimal wagePerHour;
+    public static class BenchmarkLookupResult {
+        private WageRegionCode regionCode;
+        private String regionName;
+        private BigDecimal legalFloorHourly;
+        private BigDecimal marketMultiplier;
+        private JobTier jobTier;
+        private String tierLabel;
+        private BigDecimal minMultiplier;
+        private BigDecimal recommendedMultiplier;
+        private BigDecimal maxMultiplier;
+        private BigDecimal overrideBaseWage;
         private UUID matchedRowId;
         private int fallbackLevel;
     }
 
-    /**
-     * Lấy danh sách ma trận lương có phân trang và lọc
-     */
+    @Transactional(readOnly = true)
+    public List<WageRegionDto> getAllRegions() {
+        List<WageRegion> stored = wageRegionRepository.findAllByOrderByCodeAsc();
+        if (stored.isEmpty()) {
+            return Arrays.stream(WageRegionCode.values())
+                    .map(code -> WageRegionDto.builder()
+                            .code(code)
+                            .name(code.getDisplayName())
+                            .legalFloorHourly(code.getDefaultStatutoryFloor())
+                            .marketMultiplier(BigDecimal.ONE)
+                            .isActive(true)
+                            .build())
+                    .toList();
+        }
+        return stored.stream().map(this::mapRegionToDto).toList();
+    }
+
+    @Transactional
+    public WageRegionDto updateRegion(WageRegionCode code, UpdateWageRegionRequestDto request) {
+        WageRegion region = wageRegionRepository.findById(code)
+                .orElseGet(() -> WageRegion.builder()
+                        .code(code)
+                        .name(code.getDisplayName())
+                        .legalFloorHourly(code.getDefaultStatutoryFloor())
+                        .marketMultiplier(BigDecimal.ONE)
+                        .isActive(true)
+                        .build());
+
+        region.setName(request.getName().trim());
+        region.setLegalFloorHourly(request.getLegalFloorHourly());
+        region.setMarketMultiplier(request.getMarketMultiplier());
+        region.setDescription(request.getDescription() != null ? request.getDescription().trim() : null);
+        if (request.getIsActive() != null) {
+            region.setIsActive(request.getIsActive());
+        }
+
+        WageRegion saved = wageRegionRepository.save(region);
+        log.info("Đã cập nhật cấu hình vùng lương {}: floor={}, marketMultiplier={}",
+                code, saved.getLegalFloorHourly(), saved.getMarketMultiplier());
+        return mapRegionToDto(saved);
+    }
+
     @Transactional(readOnly = true)
     public PageResponse<WageMatrixResponseDto> filterWageMatrix(
-            City city, String jobType, Boolean isActive, Pageable pageable
+            WageRegionCode regionCode, JobTier jobTier, Boolean isActive, Pageable pageable
     ) {
         Specification<WageMatrix> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-            if (city != null) {
-                predicates.add(cb.equal(root.get("city"), city));
+            if (regionCode != null) {
+                predicates.add(cb.equal(root.get("regionCode"), regionCode));
             }
-            if (jobType != null && !jobType.trim().isEmpty()) {
-                String pattern = "%" + jobType.trim().toLowerCase() + "%";
-                predicates.add(cb.like(cb.lower(root.get("jobType")), pattern));
+            if (jobTier != null) {
+                predicates.add(cb.equal(root.get("jobTier"), jobTier));
             }
             if (isActive != null) {
                 predicates.add(cb.equal(root.get("isActive"), isActive));
@@ -67,179 +120,254 @@ public class WageMatrixService {
             return cb.and(predicates.toArray(new Predicate[0]));
         };
 
+        Map<WageRegionCode, WageRegion> regionsByCode = wageRegionRepository.findAll().stream()
+                .collect(Collectors.toMap(WageRegion::getCode, Function.identity(), (a, b) -> a));
+
         Page<WageMatrix> page = wageMatrixRepository.findAll(spec, pageable);
-        return PageResponse.from(page.map(this::mapToDto));
+        return PageResponse.from(page.map(wm -> mapToDto(wm, regionsByCode.get(wm.getRegionCode()))));
     }
 
-    /**
-     * Xem chi tiết một bản ghi ma trận lương
-     */
     @Transactional(readOnly = true)
     public WageMatrixResponseDto getWageMatrixById(UUID matrixId) {
         WageMatrix wm = wageMatrixRepository.findById(matrixId)
                 .orElseThrow(() -> new ResourceNotFoundException("WageMatrix", "id", matrixId));
-        return mapToDto(wm);
+        WageRegion region = wageRegionRepository.findById(wm.getRegionCode()).orElse(null);
+        return mapToDto(wm, region);
     }
 
-    /**
-     * Tạo mới cấu hình ma trận lương (Admin)
-     */
     @Transactional
     public WageMatrixResponseDto createWageMatrix(WageMatrixRequestDto request) {
-        String trimmedJobType = request.getJobType().trim();
-        Optional<WageMatrix> existing = wageMatrixRepository.findByCityAndJobTypeIgnoreCaseAndTimeSlotAndLeadTime(
-                request.getCity(), trimmedJobType, request.getTimeSlot(), request.getLeadTime()
+        Optional<WageMatrix> existing = wageMatrixRepository.findByRegionCodeAndJobTier(
+                request.getRegionCode(), request.getJobTier()
         );
         if (existing.isPresent()) {
-            throw new BadRequestException("Cấu hình lương cho tổ hợp này đã tồn tại trong hệ thống");
+            throw new BadRequestException("Cấu hình thù lao cho cặp Vùng và Nhóm công việc này đã tồn tại");
         }
 
+        WageRegion region = resolveOrDefaultRegion(request.getRegionCode());
+        validateMultipliersAndOverride(request, region);
+
         WageMatrix wm = WageMatrix.builder()
-                .city(request.getCity())
-                .jobType(trimmedJobType)
-                .timeSlot(request.getTimeSlot())
-                .leadTime(request.getLeadTime())
-                .wagePerHour(request.getWagePerHour())
+                .regionCode(request.getRegionCode())
+                .jobTier(request.getJobTier())
+                .tierLabel(request.getTierLabel().trim())
+                .description(request.getDescription() != null ? request.getDescription().trim() : null)
+                .minMultiplier(request.getMinMultiplier())
+                .recommendedMultiplier(request.getRecommendedMultiplier())
+                .maxMultiplier(request.getMaxMultiplier())
+                .overrideBaseWage(request.getOverrideBaseWage())
                 .isActive(request.getIsActive() != null ? request.getIsActive() : true)
                 .build();
 
         WageMatrix saved = wageMatrixRepository.save(wm);
-        log.info("Đã tạo mới cấu hình ma trận lương: id={}", saved.getMatrixId());
-        return mapToDto(saved);
+        log.info("Đã tạo mới cấu hình Wage Matrix Region x JobTier: id={}, region={}, tier={}",
+                saved.getMatrixId(), saved.getRegionCode(), saved.getJobTier());
+        return mapToDto(saved, region);
     }
 
-    /**
-     * Cập nhật cấu hình ma trận lương (Admin)
-     */
     @Transactional
     public WageMatrixResponseDto updateWageMatrix(UUID matrixId, WageMatrixRequestDto request) {
         WageMatrix wm = wageMatrixRepository.findById(matrixId)
                 .orElseThrow(() -> new ResourceNotFoundException("WageMatrix", "id", matrixId));
 
-        String trimmedJobType = request.getJobType().trim();
-        wm.setCity(request.getCity());
-        wm.setJobType(trimmedJobType);
-        wm.setTimeSlot(request.getTimeSlot());
-        wm.setLeadTime(request.getLeadTime());
-        wm.setWagePerHour(request.getWagePerHour());
+        if (wm.getRegionCode() != request.getRegionCode() || wm.getJobTier() != request.getJobTier()) {
+            Optional<WageMatrix> duplicate = wageMatrixRepository.findByRegionCodeAndJobTier(
+                    request.getRegionCode(), request.getJobTier()
+            );
+            if (duplicate.isPresent() && !duplicate.get().getMatrixId().equals(matrixId)) {
+                throw new BadRequestException("Cấu hình thù lao cho cặp Vùng và Nhóm công việc này đã tồn tại");
+            }
+        }
+
+        WageRegion region = resolveOrDefaultRegion(request.getRegionCode());
+        validateMultipliersAndOverride(request, region);
+
+        wm.setRegionCode(request.getRegionCode());
+        wm.setJobTier(request.getJobTier());
+        wm.setTierLabel(request.getTierLabel().trim());
+        wm.setDescription(request.getDescription() != null ? request.getDescription().trim() : null);
+        wm.setMinMultiplier(request.getMinMultiplier());
+        wm.setRecommendedMultiplier(request.getRecommendedMultiplier());
+        wm.setMaxMultiplier(request.getMaxMultiplier());
+        wm.setOverrideBaseWage(request.getOverrideBaseWage());
         if (request.getIsActive() != null) {
             wm.setIsActive(request.getIsActive());
         }
 
         WageMatrix saved = wageMatrixRepository.save(wm);
-        log.info("Đã cập nhật cấu hình ma trận lương: id={}", saved.getMatrixId());
-        return mapToDto(saved);
+        log.info("Đã cập nhật cấu hình Wage Matrix: id={}", saved.getMatrixId());
+        return mapToDto(saved, region);
     }
 
-    /**
-     * Bật / tắt trạng thái hoạt động của cấu hình lương
-     */
     @Transactional
     public WageMatrixResponseDto toggleActive(UUID matrixId) {
         WageMatrix wm = wageMatrixRepository.findById(matrixId)
                 .orElseThrow(() -> new ResourceNotFoundException("WageMatrix", "id", matrixId));
         wm.setIsActive(!Boolean.TRUE.equals(wm.getIsActive()));
         WageMatrix saved = wageMatrixRepository.save(wm);
-        return mapToDto(saved);
+        WageRegion region = wageRegionRepository.findById(saved.getRegionCode()).orElse(null);
+        return mapToDto(saved, region);
     }
 
-    /**
-     * Xóa cấu hình ma trận lương
-     */
     @Transactional
     public void deleteWageMatrix(UUID matrixId) {
         if (!wageMatrixRepository.existsById(matrixId)) {
             throw new ResourceNotFoundException("WageMatrix", "id", matrixId);
         }
         wageMatrixRepository.deleteById(matrixId);
-        log.info("Đã xóa cấu hình ma trận lương: id={}", matrixId);
+        log.info("Đã xóa cấu hình Wage Matrix: id={}", matrixId);
     }
 
     /**
-     * Thuật toán tra cứu mức lương theo cấu trúc Fallback phân tầng
-     * Level 0: Khớp chính xác (City + JobType + TimeSlot + LeadTime)
-     * Level 1: Khớp City + JobType + TimeSlot (với LeadTime = STANDARD)
-     * Level 2: Trung bình các ca của JobType tại City đó
-     * Level 3: Trung bình các ca của JobType trên toàn quốc
-     * Level 4: Mức sàn mặc định của hệ thống
+     * Tra cứu cấu hình Region x JobTier theo 3 tầng:
+     * - Level 0: Khớp chính xác (regionCode, jobTier) đang active trong bảng wage_matrix.
+     * - Level 1: Lấy hệ số của jobTier ở một vùng khác đang active kết hợp với sàn của regionCode.
+     * - Level 2: Fallback về hệ số chuẩn Bảng A (enum JobTier) và sàn vùng (WageRegionCode).
      */
     @Transactional(readOnly = true)
-    public LookupResult lookupWage(City city, String jobType, TimeSlot timeSlot, LeadTime leadTime) {
-        String trimmed = jobType != null ? jobType.trim() : "";
+    public BenchmarkLookupResult lookupBenchmark(WageRegionCode regionCode, JobTier jobTier) {
+        WageRegion region = resolveOrDefaultRegion(regionCode);
+        BigDecimal floor = region.getLegalFloorHourly();
+        BigDecimal marketMult = region.getMarketMultiplier() != null ? region.getMarketMultiplier() : BigDecimal.ONE;
 
-        // Level 0: Exact match
-        Optional<WageMatrix> exact = wageMatrixRepository.findByCityAndJobTypeIgnoreCaseAndTimeSlotAndLeadTime(
-                city, trimmed, timeSlot, leadTime
-        );
+        Optional<WageMatrix> exact = wageMatrixRepository.findByRegionCodeAndJobTier(regionCode, jobTier);
         if (exact.isPresent() && Boolean.TRUE.equals(exact.get().getIsActive())) {
-            return LookupResult.builder()
-                    .wagePerHour(exact.get().getWagePerHour())
-                    .matchedRowId(exact.get().getMatrixId())
+            WageMatrix row = exact.get();
+            return BenchmarkLookupResult.builder()
+                    .regionCode(regionCode)
+                    .regionName(region.getName())
+                    .legalFloorHourly(floor)
+                    .marketMultiplier(marketMult)
+                    .jobTier(jobTier)
+                    .tierLabel(row.getTierLabel())
+                    .minMultiplier(row.getMinMultiplier())
+                    .recommendedMultiplier(row.getRecommendedMultiplier())
+                    .maxMultiplier(row.getMaxMultiplier())
+                    .overrideBaseWage(row.getOverrideBaseWage())
+                    .matchedRowId(row.getMatrixId())
                     .fallbackLevel(0)
                     .build();
         }
 
-        // Level 1: Same city & job & slot, STANDARD lead time
-        if (leadTime != LeadTime.STANDARD) {
-            Optional<WageMatrix> lvl1 = wageMatrixRepository.findByCityAndJobTypeIgnoreCaseAndTimeSlotAndLeadTime(
-                    city, trimmed, timeSlot, LeadTime.STANDARD
-            );
-            if (lvl1.isPresent() && Boolean.TRUE.equals(lvl1.get().getIsActive())) {
-                BigDecimal multiplier = (leadTime == LeadTime.URGENT) ? new BigDecimal("1.20") : new BigDecimal("1.10");
-                BigDecimal adjusted = lvl1.get().getWagePerHour().multiply(multiplier).setScale(2, RoundingMode.HALF_UP);
-                return LookupResult.builder()
-                        .wagePerHour(adjusted)
-                        .matchedRowId(lvl1.get().getMatrixId())
-                        .fallbackLevel(1)
-                        .build();
-            }
-        }
-
-        // Level 2: Average of jobType in that city
-        List<WageMatrix> cityMatches = wageMatrixRepository.findByCityAndJobTypeIgnoreCase(city, trimmed);
-        List<WageMatrix> activeCityMatches = cityMatches.stream().filter(m -> Boolean.TRUE.equals(m.getIsActive())).toList();
-        if (!activeCityMatches.isEmpty()) {
-            BigDecimal sum = activeCityMatches.stream().map(WageMatrix::getWagePerHour).reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal avg = sum.divide(BigDecimal.valueOf(activeCityMatches.size()), 2, RoundingMode.HALF_UP);
-            return LookupResult.builder()
-                    .wagePerHour(avg)
-                    .matchedRowId(activeCityMatches.get(0).getMatrixId())
-                    .fallbackLevel(2)
+        List<WageMatrix> otherRegions = wageMatrixRepository.findByJobTierAndIsActiveTrue(jobTier);
+        if (!otherRegions.isEmpty()) {
+            WageMatrix row = otherRegions.get(0);
+            return BenchmarkLookupResult.builder()
+                    .regionCode(regionCode)
+                    .regionName(region.getName())
+                    .legalFloorHourly(floor)
+                    .marketMultiplier(marketMult)
+                    .jobTier(jobTier)
+                    .tierLabel(row.getTierLabel())
+                    .minMultiplier(row.getMinMultiplier())
+                    .recommendedMultiplier(row.getRecommendedMultiplier())
+                    .maxMultiplier(row.getMaxMultiplier())
+                    .overrideBaseWage(null)
+                    .matchedRowId(row.getMatrixId())
+                    .fallbackLevel(1)
                     .build();
         }
 
-        // Level 3: Average of jobType across all cities
-        List<WageMatrix> allMatches = wageMatrixRepository.findByJobTypeIgnoreCase(trimmed);
-        List<WageMatrix> activeAllMatches = allMatches.stream().filter(m -> Boolean.TRUE.equals(m.getIsActive())).toList();
-        if (!activeAllMatches.isEmpty()) {
-            BigDecimal sum = activeAllMatches.stream().map(WageMatrix::getWagePerHour).reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal avg = sum.divide(BigDecimal.valueOf(activeAllMatches.size()), 2, RoundingMode.HALF_UP);
-            return LookupResult.builder()
-                    .wagePerHour(avg)
-                    .matchedRowId(activeAllMatches.get(0).getMatrixId())
-                    .fallbackLevel(3)
-                    .build();
-        }
-
-        // Level 4: Fallback floor
-        return LookupResult.builder()
-                .wagePerHour(DEFAULT_FALLBACK_WAGE)
+        return BenchmarkLookupResult.builder()
+                .regionCode(regionCode)
+                .regionName(region.getName())
+                .legalFloorHourly(floor)
+                .marketMultiplier(marketMult)
+                .jobTier(jobTier)
+                .tierLabel(jobTier.getLabel())
+                .minMultiplier(jobTier.getDefaultMinMultiplier())
+                .recommendedMultiplier(jobTier.getDefaultRecommendedMultiplier())
+                .maxMultiplier(jobTier.getDefaultMaxMultiplier())
+                .overrideBaseWage(null)
                 .matchedRowId(null)
-                .fallbackLevel(4)
+                .fallbackLevel(2)
                 .build();
     }
 
-    private WageMatrixResponseDto mapToDto(WageMatrix wm) {
+    private WageRegion resolveOrDefaultRegion(WageRegionCode code) {
+        return wageRegionRepository.findById(code)
+                .orElseGet(() -> WageRegion.builder()
+                        .code(code)
+                        .name(code.getDisplayName())
+                        .legalFloorHourly(code.getDefaultStatutoryFloor())
+                        .marketMultiplier(BigDecimal.ONE)
+                        .isActive(true)
+                        .build());
+    }
+
+    private void validateMultipliersAndOverride(WageMatrixRequestDto request, WageRegion region) {
+        if (request.getMinMultiplier().compareTo(request.getRecommendedMultiplier()) > 0
+                || request.getRecommendedMultiplier().compareTo(request.getMaxMultiplier()) > 0) {
+            throw new BadRequestException("Hệ số phải thỏa mãn: tối thiểu <= khuyên dùng <= tối đa");
+        }
+        if (request.getOverrideBaseWage() != null) {
+            if (request.getOverrideBaseWage().compareTo(region.getLegalFloorHourly()) < 0) {
+                throw new BadRequestException(String.format(
+                        "Đơn giá ghim cố định không được thấp hơn sàn pháp lý của %s (%,d đ/giờ)",
+                        region.getName(), region.getLegalFloorHourly().longValue()
+                ));
+            }
+        }
+    }
+
+    private WageRegionDto mapRegionToDto(WageRegion region) {
+        return WageRegionDto.builder()
+                .code(region.getCode())
+                .name(region.getName())
+                .legalFloorHourly(region.getLegalFloorHourly())
+                .marketMultiplier(region.getMarketMultiplier())
+                .description(region.getDescription())
+                .isActive(region.getIsActive())
+                .updatedAt(region.getUpdatedAt())
+                .build();
+    }
+
+    private WageMatrixResponseDto mapToDto(WageMatrix wm, WageRegion region) {
+        BigDecimal floor = region != null ? region.getLegalFloorHourly() : wm.getRegionCode().getDefaultStatutoryFloor();
+        BigDecimal marketMult = (region != null && region.getMarketMultiplier() != null)
+                ? region.getMarketMultiplier()
+                : BigDecimal.ONE;
+        String regionName = region != null ? region.getName() : wm.getRegionCode().getDisplayName();
+
+        BigDecimal baseFactor = floor.multiply(marketMult);
+        BigDecimal computedMin = roundToHundred(baseFactor.multiply(wm.getMinMultiplier()));
+        BigDecimal computedSuggested = wm.getOverrideBaseWage() != null
+                ? roundToThousand(wm.getOverrideBaseWage())
+                : roundToThousand(baseFactor.multiply(wm.getRecommendedMultiplier()));
+        BigDecimal computedMax = roundToHundred(baseFactor.multiply(wm.getMaxMultiplier()));
+
         return WageMatrixResponseDto.builder()
                 .matrixId(wm.getMatrixId())
-                .city(wm.getCity())
-                .jobType(wm.getJobType())
-                .timeSlot(wm.getTimeSlot())
-                .leadTime(wm.getLeadTime())
-                .wagePerHour(wm.getWagePerHour())
+                .regionCode(wm.getRegionCode())
+                .regionName(regionName)
+                .legalFloorHourly(floor)
+                .marketMultiplier(marketMult)
+                .jobTier(wm.getJobTier())
+                .jobTierLabel(wm.getJobTier().getLabel())
+                .tierLabel(wm.getTierLabel())
+                .description(wm.getDescription())
+                .minMultiplier(wm.getMinMultiplier())
+                .recommendedMultiplier(wm.getRecommendedMultiplier())
+                .maxMultiplier(wm.getMaxMultiplier())
+                .overrideBaseWage(wm.getOverrideBaseWage())
+                .computedMinWage(computedMin)
+                .computedSuggestedWage(computedSuggested)
+                .computedMaxWage(computedMax)
                 .isActive(wm.getIsActive())
                 .createdAt(wm.getCreatedAt())
                 .updatedAt(wm.getUpdatedAt())
                 .build();
+    }
+
+    private BigDecimal roundToHundred(BigDecimal val) {
+        if (val == null) return BigDecimal.ZERO;
+        return val.divide(new BigDecimal("100"), 0, RoundingMode.HALF_UP)
+                .multiply(new BigDecimal("100"));
+    }
+
+    private BigDecimal roundToThousand(BigDecimal val) {
+        if (val == null) return BigDecimal.ZERO;
+        return val.divide(new BigDecimal("1000"), 0, RoundingMode.HALF_UP)
+                .multiply(new BigDecimal("1000"));
     }
 }

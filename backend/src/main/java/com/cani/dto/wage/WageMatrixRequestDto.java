@@ -1,8 +1,7 @@
 package com.cani.dto.wage;
 
-import com.cani.entity.enums.City;
-import com.cani.entity.enums.LeadTime;
-import com.cani.entity.enums.TimeSlot;
+import com.cani.entity.enums.JobTier;
+import com.cani.entity.enums.WageRegionCode;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -19,21 +18,30 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class WageMatrixRequestDto {
 
-    @NotNull(message = "Thành phố không được để trống")
-    private City city;
+    @NotNull(message = "Vùng lương không được để trống")
+    private WageRegionCode regionCode;
 
-    @NotBlank(message = "Loại công việc không được để trống")
-    private String jobType;
+    @NotNull(message = "Nhóm bậc công việc không được để trống")
+    private JobTier jobTier;
 
-    @NotNull(message = "Khung thời gian (TimeSlot) không được để trống")
-    private TimeSlot timeSlot;
+    @NotBlank(message = "Tên hiển thị nhóm công việc không được để trống")
+    private String tierLabel;
 
-    @NotNull(message = "Thời gian chuẩn bị (LeadTime) không được để trống")
-    private LeadTime leadTime;
+    private String description;
 
-    @NotNull(message = "Mức lương mỗi giờ không được để trống")
-    @DecimalMin(value = "10000.00", message = "Mức lương tối thiểu là 10,000 VNĐ/giờ")
-    private BigDecimal wagePerHour;
+    @NotNull(message = "Hệ số tối thiểu không được để trống")
+    @DecimalMin(value = "1.00", message = "Hệ số tối thiểu phải >= 1.00")
+    private BigDecimal minMultiplier;
+
+    @NotNull(message = "Hệ số khuyên dùng không được để trống")
+    @DecimalMin(value = "1.00", message = "Hệ số khuyên dùng phải >= 1.00")
+    private BigDecimal recommendedMultiplier;
+
+    @NotNull(message = "Hệ số tối đa không được để trống")
+    @DecimalMin(value = "1.00", message = "Hệ số tối đa phải >= 1.00")
+    private BigDecimal maxMultiplier;
+
+    private BigDecimal overrideBaseWage;
 
     @Builder.Default
     private Boolean isActive = true;

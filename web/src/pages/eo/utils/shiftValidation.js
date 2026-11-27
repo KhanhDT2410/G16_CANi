@@ -399,15 +399,17 @@ export function buildEvidenceWageBenchmark({
   };
 }
 
-export const MIN_LEGAL_HOURLY_WAGE = 25000;
+export const MIN_LEGAL_HOURLY_WAGE = 22700;
 export const MIN_LEGAL_HOURLY_WAGE_ERROR =
-  'Mức thù lao không được thấp hơn mức tối thiểu quy định: 25.000 VNĐ/giờ';
+  'Mức thù lao không được thấp hơn mức tối thiểu quy định theo Nghị định 293/2025/NĐ-CP';
 
 /**
- * Kiểm tra mức thù lao so với mức lương tối thiểu pháp định (25.000 VNĐ/giờ).
+ * Kiểm tra mức thù lao so với mức lương tối thiểu pháp định theo vùng (Nghị định 293/2025/NĐ-CP).
+ * - Vùng I (Hà Nội, TP.HCM): 25.500 VNĐ/giờ.
+ * - Vùng II (Đà Nẵng): 22.700 VNĐ/giờ.
  * Tách biệt hoàn toàn logic mức gợi ý (recommendation) khỏi mức tối thiểu bắt buộc:
- * - Chặn lưu khi < 25.000 VNĐ/giờ với thông báo quy định.
- * - Cho phép lưu nếu >= 25.000 VNĐ/giờ, và chỉ hiển thị nhắc nhở nhẹ nếu thấp hơn gợi ý.
+ * - Chặn lưu khi < sàn tối thiểu của vùng với thông báo quy định.
+ * - Cho phép lưu nếu >= sàn tối thiểu vùng, và chỉ hiển thị nhắc nhở nhẹ nếu thấp hơn gợi ý thị trường.
  *
  * @param {Object} params
  * @param {number|string} params.hourlyWage Mức thù lao mỗi giờ
@@ -430,25 +432,26 @@ export function validateShiftWageAgainstFloor({
   const statutoryFloor = STATUTORY_HOURLY_FLOORS[resolvedCity] || STATUTORY_HOURLY_FLOORS.TP_HCM;
   const numWage = Math.round(Number(hourlyWage || 0));
 
-  const minFloor = Number(benchmark?.minWage || benchmark?.suggestedWage || statutoryFloor.wage);
+  const targetFloorWage = statutoryFloor.wage;
+  const minFloor = Number(benchmark?.minWage || benchmark?.suggestedWage || targetFloorWage);
 
-  if (!Number.isFinite(numWage) || numWage < MIN_LEGAL_HOURLY_WAGE) {
+  if (!Number.isFinite(numWage) || numWage < targetFloorWage) {
     return {
       isValid: false,
-      error: MIN_LEGAL_HOURLY_WAGE_ERROR,
+      error: `Mức thù lao không được thấp hơn mức tối thiểu quy định của ${statutoryFloor.regionLabel}: ${targetFloorWage.toLocaleString('vi-VN')} VNĐ/giờ (theo ${statutoryFloor.decree})`,
       warning: null,
-      floorWage: MIN_LEGAL_HOURLY_WAGE,
+      floorWage: targetFloorWage,
       recommendedMinWage: minFloor,
     };
   }
 
-  // Mức gợi ý từ checklist/benchmark chỉ mang tính tham khảo; cho phép EO lưu nếu >= 25.000 VNĐ/giờ
+  // Mức gợi ý từ checklist/benchmark chỉ mang tính tham khảo; cho phép EO lưu nếu >= sàn tối thiểu pháp định vùng
   if (numWage < minFloor) {
     return {
       isValid: true,
       error: null,
       warning: `Gợi ý: Mức thù lao thấp hơn mức tham chiếu (${minFloor.toLocaleString('vi-VN')} VNĐ/giờ), có thể ảnh hưởng tốc độ nhận ca.`,
-      floorWage: MIN_LEGAL_HOURLY_WAGE,
+      floorWage: targetFloorWage,
       recommendedMinWage: minFloor,
       isBelowAdmin: true,
     };
@@ -458,7 +461,7 @@ export function validateShiftWageAgainstFloor({
     isValid: true,
     error: null,
     warning: null,
-    floorWage: MIN_LEGAL_HOURLY_WAGE,
+    floorWage: targetFloorWage,
     recommendedMinWage: minFloor,
   };
 }

@@ -33,7 +33,7 @@ public class CreateBulkShiftsRequestDto {
     private Integer requiredWorkers = 1;
 
     @NotNull(message = "Mức lương/giờ không được để trống")
-    @DecimalMin(value = "25000", message = "Mức thù lao không được thấp hơn mức tối thiểu quy định: 25.000 VNĐ/giờ")
+    @DecimalMin(value = "1", message = "Mức thù lao theo giờ phải lớn hơn 0")
     private BigDecimal hourlyWage;
 
     @Builder.Default

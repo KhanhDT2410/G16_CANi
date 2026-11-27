@@ -86,8 +86,11 @@ public class DirectPaymentService {
         if (shift.getHourlyWage() != null && shift.getStartTime() != null && shift.getEndTime() != null) {
             long minutes = Math.max(60, Duration.between(shift.getStartTime(), shift.getEndTime()).toMinutes());
             BigDecimal hours = BigDecimal.valueOf(minutes).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+            BigDecimal shiftAllowance = shift.getAllowance() != null ? shift.getAllowance() : BigDecimal.ZERO;
+            BigDecimal emergencyBonus = assignment.getEmergencyBonus() != null ? assignment.getEmergencyBonus() : BigDecimal.ZERO;
             agreedAmount = shift.getHourlyWage().multiply(hours)
-                    .add(shift.getAllowance() != null ? shift.getAllowance() : BigDecimal.ZERO);
+                    .add(shiftAllowance)
+                    .add(emergencyBonus);
         }
 
         Payment payment = Payment.builder()

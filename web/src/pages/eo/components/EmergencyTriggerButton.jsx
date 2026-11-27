@@ -3,7 +3,7 @@ import { getShiftStaffingSummary } from '../utils/eventHelpers';
 
 const DISMISSED_STORAGE_KEY_PREFIX = 'cani_eo_dismissed_emergency_';
 
-export function openEmergencyPromptForShift(shiftId, eventId) {
+export function openEmergencyPromptForShift(shiftId, eventId, mode = 'trigger') {
   if (!shiftId || typeof window === 'undefined') return;
   try {
     sessionStorage.removeItem(DISMISSED_STORAGE_KEY_PREFIX + shiftId);
@@ -12,16 +12,16 @@ export function openEmergencyPromptForShift(shiftId, eventId) {
   }
   window.dispatchEvent(
     new CustomEvent('cani_open_emergency_prompt', {
-      detail: { shiftId, eventId: eventId || null },
+      detail: { shiftId, eventId: eventId || null, mode },
     })
   );
 }
 
 /**
  * Nút "Kích hoạt khẩn cấp" cho ca làm việc:
- * - Bật (enabled) khi ca thiếu nhân sự ở chế độ MATCHING, đang trong khung cận giờ (<= 4h trước startTime)
+ * - Bật (enabled) khi ca thiếu nhân sự ở chế độ MATCHING, trong vòng 24h trước startTime
  *   hoặc đang trong ca (IN_PROGRESS) còn tối thiểu 30 phút làm việc.
- * - Khóa (disabled) khi chưa tới khung cận giờ (> 4h trước giờ bắt đầu), kèm giải thích rõ ràng.
+ * - Khóa (disabled) khi chưa tới khung kích hoạt (> 24h trước giờ bắt đầu).
  */
 export default function EmergencyTriggerButton({ shift, event, compact = false }) {
   const summary = getShiftStaffingSummary(shift, event);
@@ -39,7 +39,9 @@ export default function EmergencyTriggerButton({ shift, event, compact = false }
     return null;
   }
 
-  const canActivateNow = Boolean(summary.nearStartUnderstaffed && summary.canTriggerEmergency);
+  const canActivateNow = Boolean(
+    summary.canTriggerEmergency && (summary.withinManualWindow || summary.isInProgress)
+  );
   // Khi ca đã vào giờ (IN_PROGRESS) nhưng không còn đủ thời gian (>= 30p) -> ẩn nút gọn gàng thay vì hiện nút khóa "Gần giờ"
   if (summary.isInProgress && !canActivateNow) {
     return null;
@@ -47,7 +49,7 @@ export default function EmergencyTriggerButton({ shift, event, compact = false }
 
   const disabledReason =
     summary.emergencyBlockReason ||
-    'Chỉ kích hoạt được khi gần đến giờ bắt đầu ca (trong vòng 4 giờ trước giờ bắt đầu).';
+    'Chỉ kích hoạt được trong vòng 24 giờ trước giờ bắt đầu ca.';
 
   return (
     <button

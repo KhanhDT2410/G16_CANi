@@ -229,4 +229,39 @@ describe('Shift Understaffed Alerts & Emergency Eligibility Helpers', () => {
     assert.equal(summary.canTriggerEmergency, false);
     assert.equal(getShiftStaffingAlerts([fullShift], event, now, 4).length, 0);
   });
+
+  it('Mở khóa nút thủ công trong vòng 24h trước giờ bắt đầu & giữ thông số redispatch/bonus', () => {
+    const within24hShift = {
+      shiftId: 's-24h',
+      jobType: 'Phục vụ bàn',
+      status: 'ACTIVE',
+      requiredWorkers: 5,
+      confirmedWorkers: 1,
+      startTime: new Date(now.getTime() + 12 * 3600 * 1000).toISOString(),
+      endTime: new Date(now.getTime() + 16 * 3600 * 1000).toISOString(),
+      emergency: false,
+    };
+    const event = { eventId: 'e1', mode: 'MATCHING', status: 'ACTIVE' };
+    const summary24h = getShiftStaffingSummary(within24hShift, event, now, 4);
+
+    assert.equal(summary24h.nearStartUnderstaffed, false);
+    assert.equal(summary24h.withinManualWindow, true);
+    assert.equal(summary24h.canTriggerEmergency, true);
+
+    const activeEmergencyShift = {
+      ...within24hShift,
+      emergency: true,
+      emergencyRadiusKm: 40,
+      emergencySkillRelaxation: 'LOWER_TIER',
+      emergencyBonus: 50000,
+      canRedispatchEmergency: true,
+      emergencyCooldownRemainingSeconds: 0,
+    };
+    const summaryActive = getShiftStaffingSummary(activeEmergencyShift, event, now, 4);
+    assert.equal(summaryActive.isEmergency, true);
+    assert.equal(summaryActive.emergencyRadiusKm, 40);
+    assert.equal(summaryActive.emergencySkillRelaxation, 'LOWER_TIER');
+    assert.equal(summaryActive.emergencyBonus, 50000);
+    assert.equal(summaryActive.canRedispatchEmergency, true);
+  });
 });

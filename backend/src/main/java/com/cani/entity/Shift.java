@@ -1,5 +1,6 @@
 package com.cani.entity;
 
+import com.cani.entity.enums.EmergencySkillRelaxation;
 import com.cani.entity.enums.ShiftStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -112,6 +113,24 @@ public class Shift {
     @Column(name = "emergency", nullable = false)
     @Builder.Default
     private Boolean emergency = false;
+
+    @Column(name = "emergency_radius_km")
+    private Double emergencyRadiusKm;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "emergency_skill_relaxation", nullable = false, length = 30)
+    @Builder.Default
+    private EmergencySkillRelaxation emergencySkillRelaxation = EmergencySkillRelaxation.NONE;
+
+    @Column(name = "emergency_min_rs")
+    private Integer emergencyMinRs;
+
+    @Column(name = "emergency_bonus", nullable = false, precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal emergencyBonus = BigDecimal.ZERO;
+
+    @Column(name = "emergency_triggered_at")
+    private Instant emergencyTriggeredAt;
 
     @Column(name = "understaffed_alert_sent", nullable = false)
     @Builder.Default

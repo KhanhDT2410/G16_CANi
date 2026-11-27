@@ -58,4 +58,20 @@ public class ShiftResponseDto {
     private Integer pendingProposalCount;
     /** Bán kính tìm kiếm khẩn cấp mặc định sẽ áp dụng (km) */
     private Double defaultEmergencyRadiusKm;
+    /** Bán kính khẩn cấp EO đang cấu hình cho ca (km) */
+    private Double emergencyRadiusKm;
+    /** Mức nới lỏng kỹ năng khẩn cấp đang áp dụng (NONE, LOWER_TIER, PREFER_ONLY) */
+    private String emergencySkillRelaxation;
+    /** Sàn điểm uy tín riêng cho chế độ khẩn cấp (nếu có) */
+    private Integer emergencyMinRs;
+    /** Phụ cấp khẩn cấp bổ sung cho nhân sự nhận ca trong đợt khẩn cấp */
+    private BigDecimal emergencyBonus;
+    /** Thời điểm kích hoạt/quét khẩn cấp gần nhất */
+    private Instant emergencyTriggeredAt;
+    /** Cho phép EO cập nhật cấu hình và quét lại khẩn cấp khi ca đang bật emergency */
+    private Boolean canRedispatchEmergency;
+    /** Số giây còn lại trước khi hết cooldown quét lại khẩn cấp */
+    private Long emergencyCooldownRemainingSeconds;
+    /** Ca có thuộc nhóm phổ thông cho phép tùy chọn PREFER_ONLY hay không */
+    private Boolean emergencyPreferOnlyAllowed;
 }

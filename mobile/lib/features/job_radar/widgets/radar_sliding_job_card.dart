@@ -230,7 +230,11 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                     child: Text(
                       s.isConflicting
                           ? 'Bạn đã có ca nhận rồi'
-                          : (s.emergency ? 'Khẩn cấp' : 'Matching'),
+                          : (s.emergency
+                              ? (s.emergencyBonus > 0
+                                  ? 'Khẩn cấp +${(s.emergencyBonus / 1000).round()}k'
+                                  : 'Khẩn cấp')
+                              : 'Matching'),
                       style: TextStyle(
                         fontSize: 10.5,
                         fontWeight: FontWeight.w700,

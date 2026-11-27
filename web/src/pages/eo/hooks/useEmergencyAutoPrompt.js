@@ -15,10 +15,11 @@ export function useEmergencyAutoPrompt({ events = [], onReloadEvents }) {
   const activePromptIdRef = useRef(null);
   const pendingPromptShiftIdRef = useRef(null);
 
-  // Lắng nghe sự kiện người dùng bấm vào thông báo chuông khẩn cấp (Ticket EO-011)
+  // Lắng nghe sự kiện người dùng bấm vào thông báo chuông khẩn cấp (Ticket EO-011) hoặc bấm Mở rộng / Quét lại
   useEffect(() => {
     const handleOpenPrompt = (e) => {
       const shiftId = e.detail?.shiftId != null ? String(e.detail.shiftId).trim() : '';
+      const mode = e.detail?.mode === 'redispatch' ? 'redispatch' : 'trigger';
       if (!shiftId) return;
       if (typeof window !== 'undefined') {
         sessionStorage.removeItem(DISMISSED_STORAGE_KEY_PREFIX + shiftId);
@@ -29,7 +30,7 @@ export function useEmergencyAutoPrompt({ events = [], onReloadEvents }) {
           if (!evt || !Array.isArray(evt.shifts)) continue;
           const s = evt.shifts.find((item) => String(item.shiftId) === shiftId);
           if (s) {
-            foundPair = { shift: s, event: evt };
+            foundPair = { shift: s, event: evt, mode };
             break;
           }
         }
@@ -37,12 +38,29 @@ export function useEmergencyAutoPrompt({ events = [], onReloadEvents }) {
 
       if (foundPair) {
         const summary = getShiftStaffingSummary(foundPair.shift, foundPair.event, new Date());
-        if (!summary.canTriggerEmergency || !summary.nearStartUnderstaffed || summary.isEmergency || summary.isInviteMode) {
+        if (mode === 'redispatch') {
+          if (!summary.isEmergency || !summary.canRedispatchEmergency) {
+            showToast(
+              summary.emergencyCooldownRemainingSeconds > 0
+                ? `Vui lòng chờ ${summary.emergencyCooldownRemainingSeconds} giây trước khi quét lại.`
+                : 'Ca làm việc hiện không ở trạng thái có thể quét lại khẩn cấp.',
+              'info'
+            );
+            return;
+          }
+          activePromptIdRef.current = foundPair.shift.shiftId;
+          setPromptTarget(foundPair);
+          pendingPromptShiftIdRef.current = null;
+          return;
+        }
+
+        const allowManualNow = summary.canTriggerEmergency && (summary.withinManualWindow || summary.isInProgress);
+        if (!allowManualNow || summary.isEmergency || summary.isInviteMode) {
           showToast(
             summary.isEmergency
               ? 'Ca làm việc đang được điều phối khẩn cấp.'
-              : !summary.nearStartUnderstaffed && summary.canTriggerEmergency
-              ? 'Chỉ có thể kích hoạt điều phối khẩn cấp khi gần đến giờ bắt đầu ca (trong vòng 4 giờ trước giờ bắt đầu).'
+              : !summary.withinManualWindow && summary.canTriggerEmergency
+              ? 'Chỉ có thể kích hoạt điều phối khẩn cấp trong vòng 24 giờ trước giờ bắt đầu ca.'
               : summary.emergencyBlockReason || 'Ca làm việc hiện không đủ điều kiện kích hoạt khẩn cấp thủ công.',
             'info'
           );
@@ -57,9 +75,17 @@ export function useEmergencyAutoPrompt({ events = [], onReloadEvents }) {
       }
     };
 
+    const handleReloadSignal = () => {
+      onReloadEvents?.();
+    };
+
     window.addEventListener('cani_open_emergency_prompt', handleOpenPrompt);
-    return () => window.removeEventListener('cani_open_emergency_prompt', handleOpenPrompt);
-  }, [events]);
+    window.addEventListener('cani_eo_reload_events', handleReloadSignal);
+    return () => {
+      window.removeEventListener('cani_open_emergency_prompt', handleOpenPrompt);
+      window.removeEventListener('cani_eo_reload_events', handleReloadSignal);
+    };
+  }, [events, onReloadEvents]);
 
   useEffect(() => {
     if (!Array.isArray(events) || events.length === 0) return;
@@ -130,16 +156,20 @@ export function useEmergencyAutoPrompt({ events = [], onReloadEvents }) {
     }
   }, [events, promptTarget]);
 
-  const handleAccept = async (shiftId, radiusKm) => {
+  const handleAccept = async (shiftId, optionsOrRadius) => {
+    const isRedispatch = promptTarget?.mode === 'redispatch';
+    const radiusKm = typeof optionsOrRadius === 'object' ? optionsOrRadius?.radiusKm : optionsOrRadius;
     setIsSubmitting(true);
     try {
-      const result = await eoService.enableEmergencyDispatch(shiftId, radiusKm);
+      const result = isRedispatch
+        ? await eoService.redispatchEmergencyDispatch(shiftId, optionsOrRadius)
+        : await eoService.enableEmergencyDispatch(shiftId, optionsOrRadius);
       const dispatched = Number(result?.dispatchedCount || 0);
-      const appliedRadius = Number(result?.effectiveRadiusKm || radiusKm);
+      const appliedRadius = Number(result?.effectiveRadiusKm || radiusKm || 25);
 
       if (dispatched > 0) {
         showToast(
-          `Đã kích hoạt điều phối khẩn cấp (${appliedRadius} km): Gửi ${dispatched} đề xuất đến Worker phù hợp theo Preference.`,
+          `Đã ${isRedispatch ? 'quét lại' : 'kích hoạt'} điều phối khẩn cấp (${appliedRadius} km): Gửi ${dispatched} đề xuất đến Worker phù hợp.`,
           'success'
         );
       } else {

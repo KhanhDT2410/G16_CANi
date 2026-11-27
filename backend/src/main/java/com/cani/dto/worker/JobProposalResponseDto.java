@@ -52,4 +52,10 @@ public class JobProposalResponseDto {
     @Builder.Default
     private Boolean isConflicting = false;
     private String conflictReason;
+
+    @Builder.Default
+    private Boolean emergency = false;
+
+    @Builder.Default
+    private BigDecimal emergencyBonus = BigDecimal.ZERO;
 }

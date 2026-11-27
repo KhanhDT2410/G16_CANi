@@ -647,7 +647,10 @@ public class WorkerGroupService {
             throw new BadRequestException("Đề xuất ca làm việc này đã hết hạn phản hồi");
         }
         Shift shift = proposal.getShift();
-        if (shift.getStatus() != ShiftStatus.ACTIVE) {
+        boolean isEmergencyInProgress = shift.getStatus() == ShiftStatus.IN_PROGRESS
+                && Boolean.TRUE.equals(shift.getEmergency())
+                && (shift.getEndTime() == null || Instant.now().isBefore(shift.getEndTime()));
+        if (shift.getStatus() != ShiftStatus.ACTIVE && !isEmergencyInProgress) {
             throw new BadRequestException("Ca làm việc này không còn ở trạng thái đang mở");
         }
 
@@ -736,6 +739,22 @@ public class WorkerGroupService {
         if (updatedRows == 0) {
             throw new AppException("Ca vừa đủ người trước khi bạn xác nhận", HttpStatus.CONFLICT);
         }
+        int previousConfirmed = shift.getConfirmedWorkers() != null ? shift.getConfirmedWorkers() : 0;
+        int required = shift.getRequiredWorkers() != null ? shift.getRequiredWorkers() : 1;
+        boolean nowFull = (previousConfirmed + packSize) >= required;
+        boolean wasEmergency = Boolean.TRUE.equals(shift.getEmergency());
+        BigDecimal emergencyBonusSnapshot = (wasEmergency && shift.getEmergencyBonus() != null
+                && shift.getEmergencyBonus().compareTo(BigDecimal.ZERO) > 0)
+                        ? shift.getEmergencyBonus()
+                        : BigDecimal.ZERO;
+        if (nowFull) {
+            if (shift.getStatus() == ShiftStatus.ACTIVE) {
+                shift.setStatus(ShiftStatus.FULLY_STAFFED);
+            }
+            shift.setEmergency(false);
+            shift.setUnderstaffedAlertSent(false);
+            shiftRepository.save(shift);
+        }
 
         // Guard chống trùng lặp assignment active trong cùng shift
         // shortcut: H2 không hỗ trợ partial unique index; production PostgreSQL mới có
@@ -770,6 +789,7 @@ public class WorkerGroupService {
                         .groupId(groupId)
                         .isGroupLeader(m.getRoleInGroup() == GroupRole.LEADER)
                         .eoConfirmed(false)
+                        .emergencyBonus(emergencyBonusSnapshot)
                         .build();
                 assignment = shiftAssignmentRepository.save(assignment);
                 assignmentIds.add(assignment.getAssignmentId());

@@ -29,6 +29,8 @@ class JobProposalItem {
   final String? imageUrl;
   final bool isConflicting;
   final String? conflictReason;
+  final bool emergency;
+  final double emergencyBonus;
 
   bool isActiveAt(DateTime now) {
     if (status.toUpperCase() != 'PENDING') return false;
@@ -67,6 +69,8 @@ class JobProposalItem {
     this.imageUrl,
     this.isConflicting = false,
     this.conflictReason,
+    this.emergency = false,
+    this.emergencyBonus = 0.0,
   });
 
   factory JobProposalItem.fromJson(Map<String, dynamic> json) {
@@ -100,6 +104,8 @@ class JobProposalItem {
       imageUrl: json['imageUrl'] as String?,
       isConflicting: json['isConflicting'] == true || json['conflicting'] == true,
       conflictReason: json['conflictReason'] as String?,
+      emergency: json['emergency'] == true,
+      emergencyBonus: (json['emergencyBonus'] is num) ? (json['emergencyBonus'] as num).toDouble() : 0.0,
     );
   }
 }
@@ -123,6 +129,7 @@ class ShiftAssignmentItem {
   final String? performedSkillName;
   final String? confirmedPerformedSkillName;
   final double hourlyWage;
+  final double emergencyBonus;
   final double totalPay;
   final String status;
   final bool eoConfirmed;
@@ -172,6 +179,7 @@ class ShiftAssignmentItem {
     this.performedSkillName,
     this.confirmedPerformedSkillName,
     required this.hourlyWage,
+    this.emergencyBonus = 0.0,
     required this.totalPay,
     required this.status,
     this.eoConfirmed = false,
@@ -227,6 +235,9 @@ class ShiftAssignmentItem {
       hourlyWage: (json['hourlyWage'] is num)
           ? (json['hourlyWage'] as num).toDouble()
           : (double.tryParse(json['hourlyWage']?.toString() ?? '') ?? 0.0),
+      emergencyBonus: (json['emergencyBonus'] is num)
+          ? (json['emergencyBonus'] as num).toDouble()
+          : (double.tryParse(json['emergencyBonus']?.toString() ?? '') ?? 0.0),
       totalPay: (json['totalPay'] is num)
           ? (json['totalPay'] as num).toDouble()
           : (double.tryParse(json['totalPay']?.toString() ?? '') ?? 0.0),

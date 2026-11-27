@@ -2,9 +2,26 @@ import React from 'react';
 
 /**
  * EmergencyConsequencesCallout (Ticket EO-010)
- * Khối cảnh báo chi tiết các hệ quả khi mở rộng tìm kiếm khẩn cấp.
+ * Khối cảnh báo chi tiết các hệ quả thực tế khi kích hoạt điều phối khẩn cấp.
  */
-export default function EmergencyConsequencesCallout({ radiusKm, wageFormatted }) {
+export default function EmergencyConsequencesCallout({
+  radiusKm,
+  wageFormatted,
+  skillRelaxation = 'NONE',
+  emergencyBonus = 0,
+}) {
+  const bonusFormatted =
+    Number(emergencyBonus) > 0
+      ? new Intl.NumberFormat('vi-VN').format(Number(emergencyBonus)) + ' đ/suất'
+      : null;
+
+  const skillDesc =
+    skillRelaxation === 'PREFER_ONLY'
+      ? 'Không chặn ứng viên chưa gắn kỹ năng phổ thông (vẫn ưu tiên điểm người có kỹ năng & giữ cứng chứng chỉ an toàn).'
+      : skillRelaxation === 'LOWER_TIER'
+      ? 'Giữ nguyên kỹ năng bắt buộc, hạ 1 bậc mức xác minh hồ sơ (trừ kỹ năng đòi hỏi chứng chỉ).'
+      : 'Giữ nguyên toàn bộ kỹ năng, chứng chỉ & sàn uy tín; chỉ mở khóa nhận ca ngoài lịch rảnh tuần cố định cho Worker đang Online.';
+
   return (
     <div
       style={{
@@ -22,16 +39,23 @@ export default function EmergencyConsequencesCallout({ radiusKm, wageFormatted }
       </div>
       <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.81rem', color: '#78350f', lineHeight: 1.5 }}>
         <li>
-          <strong>Mở rộng bán kính địa lý ({radiusKm} km):</strong> Hệ thống quét Worker ở xa điểm tổ chức hơn, cần lưu ý thời gian di chuyển của Worker khi sát giờ.
+          <strong>Mở rộng bán kính địa lý ({radiusKm} km):</strong> Quét Worker đang Online trong phạm vi {radiusKm} km (bỏ qua trần bán kính cá nhân) và mở ứng tuyển trực tiếp trên Job Radar.
         </li>
         <li>
-          <strong>Nới lỏng điều kiện kinh nghiệm theo Preference:</strong> Ưu tiên ghép nhanh với Worker đang Online, áp dụng Fairness Boost cho ứng viên ít ca hơn (vẫn bảo đảm đáp ứng kỹ năng bắt buộc).
+          <strong>Chính sách kỹ năng &amp; an toàn:</strong> {skillDesc}
         </li>
         <li>
-          <strong>Thời hạn đề xuất:</strong> Lời mời gửi đến Worker sẽ tự động hết hạn sau <strong>30 phút</strong> để tránh giữ chỗ ảo.
+          <strong>Thời hạn đề xuất:</strong> Lời mời gửi đến Worker hết hạn sau <strong>30 phút</strong>; hệ thống tự tắt khẩn cấp ngay khi chốt đủ nhân sự.
         </li>
         <li>
-          <strong>Thù lao giữ nguyên:</strong> Giữ cố định mức <strong>{wageFormatted}</strong> theo thỏa thuận ban đầu.
+          <strong>Thù lao:</strong> Giữ mức <strong>{wageFormatted}</strong>
+          {bonusFormatted ? (
+            <>
+              {' '}và cộng thêm <strong>{bonusFormatted}</strong> cho nhân sự nhận ca trong đợt khẩn cấp (không ảnh hưởng người đã chốt trước đó).
+            </>
+          ) : (
+            <> theo thỏa thuận ban đầu.</>
+          )}
         </li>
       </ul>
     </div>

@@ -54,6 +54,11 @@ public class WorkerShiftEligibilityService {
     @Autowired(required = false)
     private SkillRepository skillRepository;
 
+    @Autowired(required = false)
+    private JobTierClassifier jobTierClassifier;
+
+    private static final int RECENT_NO_SHOW_BLOCK_DAYS = 7;
+
     public WorkerShiftEligibilityService(
             WorkerSkillRepository workerSkillRepository,
             ShiftSkillRequirementRepository shiftSkillRequirementRepository,
@@ -297,23 +302,43 @@ public class WorkerShiftEligibilityService {
             }
         }
 
+        // 4.5. Chặn Worker có No-show trong 7 ngày gần nhất không nhận ca khẩn cấp (tránh gãy dây chuyền lần 2)
+        if ((channel == MatchingChannel.EMERGENCY_DISPATCH || channel == MatchingChannel.EMERGENCY_APPLY)
+                && shiftAssignmentRepository != null && worker.getWorkerId() != null) {
+            Instant noShowCutoff = Instant.now().minus(java.time.Duration.ofDays(RECENT_NO_SHOW_BLOCK_DAYS));
+            List<UUID> recentNoShows = shiftAssignmentRepository.findWorkerIdsByStatusAndUpdatedAtAfter(
+                    AssignmentStatus.NO_SHOW, noShowCutoff);
+            if (recentNoShows != null && recentNoShows.contains(worker.getWorkerId())) {
+                return EligibilityResult.fail("RECENT_NO_SHOW_RESTRICTION",
+                        "Tài khoản đang bị tạm hạn chế nhận ca khẩn cấp do có vi phạm vắng mặt (No-show) trong 7 ngày gần đây.");
+            }
+        }
+
         // 5. Điều kiện riêng cho kênh Matching tự động (Online, MinWage, Availability)
         if (isAutomaticMatching) {
             if (!Boolean.TRUE.equals(worker.getIsOnline())) {
                 return EligibilityResult.fail("WORKER_OFFLINE", "Nhân sự hiện đang ngoại tuyến.");
             }
             if (worker.getMinWage() != null && worker.getMinWage().compareTo(BigDecimal.ZERO) > 0) {
-                if (shift.getHourlyWage() == null || shift.getHourlyWage().compareTo(worker.getMinWage()) < 0) {
+                BigDecimal effectiveHourlyOrTotal = shift.getHourlyWage();
+                if (effectiveHourlyOrTotal == null || effectiveHourlyOrTotal.compareTo(worker.getMinWage()) < 0) {
                     return EligibilityResult.fail("MIN_WAGE_NOT_MET",
                             "Mức lương của ca thấp hơn mức mong muốn tối thiểu của nhân sự.");
                 }
             }
-            boolean covered = (context != null && context.availabilitySlots() != null)
-                    ? isShiftCoveredByAvailability(context.availabilitySlots(), shift)
-                    : isShiftCoveredByAvailability(worker, shift);
-            if (!covered) {
-                return EligibilityResult.fail("AVAILABILITY_MISMATCH",
-                        "Khung giờ ca làm không nằm trong lịch rảnh hàng tuần của nhân sự.");
+            // Ở chế độ Emergency Dispatch khi EO bật nới lỏng tiêu chí, Worker đang Online được nhận ca ngoài lịch rảnh tuần cố định
+            boolean relaxWeeklyAvailability = channel == MatchingChannel.EMERGENCY_DISPATCH
+                    && Boolean.TRUE.equals(shift.getEmergency())
+                    && shift.getEmergencySkillRelaxation() != null
+                    && shift.getEmergencySkillRelaxation() != EmergencySkillRelaxation.NONE;
+            if (!relaxWeeklyAvailability) {
+                boolean covered = (context != null && context.availabilitySlots() != null)
+                        ? isShiftCoveredByAvailability(context.availabilitySlots(), shift)
+                        : isShiftCoveredByAvailability(worker, shift);
+                if (!covered) {
+                    return EligibilityResult.fail("AVAILABILITY_MISMATCH",
+                            "Khung giờ ca làm không nằm trong lịch rảnh hàng tuần của nhân sự.");
+                }
             }
         }
 
@@ -331,6 +356,15 @@ public class WorkerShiftEligibilityService {
 
         boolean hasOverrideReason = inviteOverrideReason != null && !inviteOverrideReason.trim().isBlank();
         boolean usedOverride = false;
+
+        boolean isEmergencyChannel = channel == MatchingChannel.EMERGENCY_DISPATCH
+                || channel == MatchingChannel.EMERGENCY_APPLY;
+        EmergencySkillRelaxation relaxation = (isEmergencyChannel && Boolean.TRUE.equals(shift.getEmergency())
+                && shift.getEmergencySkillRelaxation() != null)
+                        ? shift.getEmergencySkillRelaxation()
+                        : EmergencySkillRelaxation.NONE;
+        boolean allowPreferOnly = relaxation == EmergencySkillRelaxation.PREFER_ONLY
+                && isPreferOnlyRelaxationAllowed(shift);
 
         if (!requiredReqs.isEmpty()) {
             List<WorkerSkill> workerSkills;
@@ -358,15 +392,25 @@ public class WorkerShiftEligibilityService {
                 String displaySkillName = resolveDisplaySkillName(req);
 
                 if (req.requiresValidCertificate()) {
-                    // Chứng chỉ bắt buộc / an toàn: KHÔNG BAO GIỜ cho phép bypass kể cả Invite Mode
+                    // Chứng chỉ bắt buộc / an toàn: KHÔNG BAO GIỜ cho phép bypass kể cả Invite Mode hay Emergency
                     if (!hasValidCertificate(ws, now) || !meetsVerificationTier(ws, req.minVerificationTier(), now)) {
                         return EligibilityResult.fail("CERTIFICATE_REQUIRED_OR_EXPIRED",
                                 "Ca làm việc yêu cầu chứng chỉ còn hiệu lực cho kỹ năng \"" + displaySkillName + "\".");
                     }
                 }
 
+                // Với ca phổ thông (TIER_1..TIER_3) bật PREFER_ONLY, kỹ năng không gắn chứng chỉ được chuyển sang ưu tiên điểm
+                if (!req.requiresValidCertificate() && allowPreferOnly) {
+                    continue;
+                }
+
+                VerificationTier effectiveMinTier = (!req.requiresValidCertificate()
+                        && relaxation == EmergencySkillRelaxation.LOWER_TIER)
+                                ? stepDownVerificationTier(req.minVerificationTier())
+                                : req.minVerificationTier();
+
                 boolean hasSkill = isWorkerSkillActiveAndUsable(ws, now);
-                boolean meetsTier = hasSkill && meetsVerificationTier(ws, req.minVerificationTier(), now);
+                boolean meetsTier = hasSkill && meetsVerificationTier(ws, effectiveMinTier, now);
 
                 if (!hasSkill) {
                     if (channel == MatchingChannel.INVITE_MODE && hasOverrideReason) {
@@ -382,16 +426,20 @@ public class WorkerShiftEligibilityService {
                     } else {
                         return EligibilityResult.fail("INSUFFICIENT_VERIFICATION_TIER",
                                 "Kỹ năng \"" + displaySkillName + "\" cần đạt mức xác minh tối thiểu: "
-                                        + toTierLabelVi(req.minVerificationTier()) + ".");
+                                        + toTierLabelVi(effectiveMinTier) + ".");
                     }
                 }
             }
         }
 
         // 7. Điểm uy tín (RS) & Kinh nghiệm tối thiểu
-        int minRs = (shift.getMinReliabilityScore() != null && shift.getMinReliabilityScore() > 0)
+        int baseMinRs = (shift.getMinReliabilityScore() != null && shift.getMinReliabilityScore() > 0)
                 ? shift.getMinReliabilityScore()
                 : DEFAULT_MIN_RELIABILITY;
+        int minRs = (isEmergencyChannel && Boolean.TRUE.equals(shift.getEmergency())
+                && shift.getEmergencyMinRs() != null)
+                        ? Math.max(50, Math.min(baseMinRs, shift.getEmergencyMinRs()))
+                        : baseMinRs;
         if (worker.getReliabilityScore() == null || worker.getReliabilityScore() < minRs) {
             if (channel == MatchingChannel.INVITE_MODE && hasOverrideReason) {
                 usedOverride = true;
@@ -769,6 +817,24 @@ public class WorkerShiftEligibilityService {
             return skillRepository.findById(req.skillId()).map(Skill::getName).orElse("Kỹ năng chuyên môn");
         }
         return "Kỹ năng chuyên môn";
+    }
+
+    public boolean isPreferOnlyRelaxationAllowed(Shift shift) {
+        if (shift == null) {
+            return false;
+        }
+        JobTierClassifier classifier = jobTierClassifier != null ? jobTierClassifier : new JobTierClassifier();
+        JobTier tier = classifier.classify(shift.getJobType(), null);
+        return tier == JobTier.TIER_1_GENERAL
+                || tier == JobTier.TIER_2_SERVICE
+                || tier == JobTier.TIER_3_PHYSICAL;
+    }
+
+    private VerificationTier stepDownVerificationTier(VerificationTier tier) {
+        if (tier == VerificationTier.PLATFORM_PROVEN) {
+            return VerificationTier.AI_DOCUMENT;
+        }
+        return VerificationTier.SELF_DECLARED;
     }
 
     private String toTierLabelVi(VerificationTier tier) {

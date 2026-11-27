@@ -216,9 +216,10 @@ export default function EOModals({
             shift={promptTarget.shift}
             event={promptTarget.event}
             onClose={() => handleAutoPromptDecline(promptTarget.shift.shiftId)}
-            onConfirm={({ radiusKm }) => handleAutoPromptAccept(promptTarget.shift.shiftId, radiusKm)}
+            onConfirm={(payload) => handleAutoPromptAccept(promptTarget.shift.shiftId, payload)}
             isSubmitting={isAutoPromptSubmitting}
-            isAutoPrompt={true}
+            isAutoPrompt={promptTarget.mode !== 'redispatch'}
+            isRedispatch={promptTarget.mode === 'redispatch'}
           />
         </Suspense>
       )}

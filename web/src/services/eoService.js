@@ -384,11 +384,49 @@ export const eoService = {
   // ĐIỀU PHỐI KHẨN CẤP (EMERGENCY DISPATCH - UC-59)
   // ==========================================
   // Bật điều phối khẩn cấp (Emergency Dispatch) cho ca làm việc
-  enableEmergencyDispatch: async (shiftId, radiusKm = 25) => {
-    const params = radiusKm != null && Number(radiusKm) > 0 ? { radiusKm: Number(radiusKm) } : undefined;
-    const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/emergency-dispatch`, null, {
-      params,
-    });
+  enableEmergencyDispatch: async (shiftId, optionsOrRadius = 25) => {
+    const payload =
+      typeof optionsOrRadius === 'object' && optionsOrRadius !== null
+        ? {
+            radiusKm: optionsOrRadius.radiusKm != null ? Number(optionsOrRadius.radiusKm) : 25,
+            skillRelaxation: optionsOrRadius.skillRelaxation || 'NONE',
+            minReliabilityScore:
+              optionsOrRadius.minReliabilityScore != null && optionsOrRadius.minReliabilityScore !== ''
+                ? Number(optionsOrRadius.minReliabilityScore)
+                : null,
+            emergencyBonus:
+              optionsOrRadius.emergencyBonus != null && Number(optionsOrRadius.emergencyBonus) > 0
+                ? Number(optionsOrRadius.emergencyBonus)
+                : 0,
+          }
+        : {
+            radiusKm: optionsOrRadius != null && Number(optionsOrRadius) > 0 ? Number(optionsOrRadius) : 25,
+          };
+    const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/emergency-dispatch`, payload);
+    return response.data?.data;
+  },
+
+  // Cập nhật tham số (bán kính, nới lỏng kỹ năng, phụ cấp) và quét lại điều phối khẩn cấp
+  redispatchEmergencyDispatch: async (shiftId, options = {}) => {
+    const payload = {
+      radiusKm: options.radiusKm != null ? Number(options.radiusKm) : undefined,
+      skillRelaxation: options.skillRelaxation || undefined,
+      minReliabilityScore:
+        options.minReliabilityScore != null && options.minReliabilityScore !== ''
+          ? Number(options.minReliabilityScore)
+          : undefined,
+      emergencyBonus:
+        options.emergencyBonus != null && Number(options.emergencyBonus) >= 0
+          ? Number(options.emergencyBonus)
+          : undefined,
+    };
+    const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/emergency-dispatch/redispatch`, payload);
+    return response.data?.data;
+  },
+
+  // Tắt chế độ điều phối khẩn cấp cho ca làm việc
+  disableEmergencyDispatch: async (shiftId) => {
+    const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/emergency-dispatch/off`);
     return response.data?.data;
   },
 

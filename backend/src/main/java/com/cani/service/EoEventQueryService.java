@@ -452,6 +452,11 @@ public class EoEventQueryService {
                 ? (s.getPerformedSkillId() != null ? batchContext.skillNamesById().get(s.getPerformedSkillId()) : null)
                 : resolveSkillNameById(s.getPerformedSkillId());
 
+        boolean isEmergencyActive = Boolean.TRUE.equals(s.getEmergency()) && eligibility.missingWorkers() > 0;
+        ShiftStaffingPolicy.RedispatchEligibility redispatchEligibility = isEmergencyActive
+                ? policy.evaluateRedispatchEligibility(s, now)
+                : new ShiftStaffingPolicy.RedispatchEligibility(false, null, 0L);
+
         return ShiftResponseDto.builder()
                 .shiftId(s.getShiftId())
                 .eventId(s.getEvent() != null ? s.getEvent().getEventId() : null)
@@ -479,13 +484,23 @@ public class EoEventQueryService {
                 .performedSkillName(performedSkillName)
                 .skillRequirements(reqDtos)
                 .customSkillNotes(s.getCustomSkillNotes())
-                .emergency(Boolean.TRUE.equals(s.getEmergency()) && eligibility.missingWorkers() > 0)
+                .emergency(isEmergencyActive)
                 .missingWorkers(eligibility.missingWorkers())
                 .nearStartUnderstaffed(eligibility.nearStartUnderstaffed())
                 .canTriggerEmergency(eligibility.canTriggerEmergency())
                 .emergencyBlockReason(eligibility.blockReason())
                 .pendingProposalCount(eligibility.pendingProposalCount())
-                .defaultEmergencyRadiusKm(eligibility.defaultEmergencyRadiusKm())
+                .defaultEmergencyRadiusKm(policy.resolveRecommendedEmergencyRadiusKm(s, now))
+                .emergencyRadiusKm(s.getEmergencyRadiusKm())
+                .emergencySkillRelaxation(s.getEmergencySkillRelaxation() != null
+                        ? s.getEmergencySkillRelaxation().name()
+                        : com.cani.entity.enums.EmergencySkillRelaxation.NONE.name())
+                .emergencyMinRs(s.getEmergencyMinRs())
+                .emergencyBonus(s.getEmergencyBonus() != null ? s.getEmergencyBonus() : BigDecimal.ZERO)
+                .emergencyTriggeredAt(s.getEmergencyTriggeredAt())
+                .canRedispatchEmergency(redispatchEligibility.canRedispatch())
+                .emergencyCooldownRemainingSeconds(redispatchEligibility.cooldownRemainingSeconds())
+                .emergencyPreferOnlyAllowed(policy.isPreferOnlyRelaxationAllowed(s))
                 .build();
     }
 
